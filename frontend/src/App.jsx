@@ -20,6 +20,7 @@ import AddJob from './pages/AddJob'
 import SavedOpportunities from './pages/SavedOpportunities'
 import Applications from './pages/Applications'
 import NotFound from './pages/NotFound'
+import AuthCallback from './pages/AuthCallback'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ function App() {
                 <Route path="/saved" element={<SavedOpportunities />} />
                 <Route path="/applications" element={<Applications />} />
                 <Route path="*" element={<NotFound />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
               </Routes>
             </MainLayout>
           </Router>
