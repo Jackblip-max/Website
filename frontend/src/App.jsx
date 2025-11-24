@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 
+import CompleteProfile from './pages/CompleteProfile'
 import MainLayout from './layouts/MainLayout'
 import Home from './pages/Home'
 import About from './pages/About'
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/applications" element={<Applications />} />
                 <Route path="*" element={<NotFound />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/complete-profile" element={<CompleteProfile />} />
               </Routes>
             </MainLayout>
           </Router>
