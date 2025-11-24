@@ -163,3 +163,46 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to update profile', error: error.message })
   }
 }
+
+export const completeProfile = async (req, res) => {
+  try {
+    const { phone, education, skills, teamwork, motivation } = req.body
+
+    const user = await User.findByPk(req.user.id)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Update user phone
+    if (phone) user.phone = phone
+    await user.save()
+
+    // Update or create volunteer profile
+    let volunteer = await Volunteer.findOne({ where: { userId: user.id } })
+    
+    if (!volunteer) {
+      volunteer = await Volunteer.create({
+        userId: user.id,
+        education: education || 'undergraduate',
+        skills: skills || '',
+        teamwork: teamwork || false,
+        motivation: motivation || ''
+      })
+    } else {
+      await volunteer.update({
+        education: education || volunteer.education,
+        skills: skills !== undefined ? skills : volunteer.skills,
+        teamwork: teamwork !== undefined ? teamwork : volunteer.teamwork,
+        motivation: motivation !== undefined ? motivation : volunteer.motivation
+      })
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile completed successfully'
+    })
+  } catch (error) {
+    console.error('Complete profile error:', error)
+    res.status(500).json({ message: 'Failed to complete profile', error: error.message })
+  }
+}
