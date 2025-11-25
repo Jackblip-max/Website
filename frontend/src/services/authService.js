@@ -29,6 +29,10 @@ export const authService = {
     return await api.put('/auth/profile', userData)
   },
 
+  completeProfile: async (userData) => {
+    return await api.post('/auth/complete-profile', userData)
+  },
+
   logout: () => {
     localStorage.removeItem('token')
   }
