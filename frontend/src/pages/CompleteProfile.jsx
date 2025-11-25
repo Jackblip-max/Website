@@ -10,8 +10,10 @@ const CompleteProfile = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const { checkAuth } = useAuth()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
-    phone: '',
+    name: user?.name || '',
+    phone: user?.phone || '',
     education: 'undergraduate',
     skills: '',
     teamwork: false,
@@ -19,14 +21,17 @@ const CompleteProfile = () => {
   })
 
   const completeMutation = useMutation({
-    mutationFn: (data) => authService.updateProfile(data),
-    onSuccess: async () => {
-      await checkAuth()
+    mutationFn: (data) => authService.completeProfile(data),
+    onSuccess: async (response) => {
+      // Update local auth state with new user data
+      if (response.user) {
+        await checkAuth()
+      }
       toast.success('Profile completed successfully!')
       navigate('/')
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update profile')
+      toast.error(error.response?.data?.message || 'Failed to complete profile')
     }
   })
 
@@ -50,6 +55,19 @@ const CompleteProfile = () => {
         <p className="text-gray-600 mb-6">Please provide additional information to complete your volunteer profile.</p>
         
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('name')}</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Full Name"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              required
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('phone')}</label>
             <input
