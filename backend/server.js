@@ -4,6 +4,8 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import dotenv from 'dotenv'
 import cron from 'node-cron'
+import session from 'express-session'
+import passport from './src/config/passport.js'
 import app from './src/app.js'
 import { sequelize } from './src/config/database.js'
 import { checkExpiredDeadlines } from './src/jobs/deadlineChecker.js'
@@ -32,6 +34,21 @@ const connectDB = async () => {
 // Initialize server
 const startServer = async () => {
   await connectDB()
+  
+  // Session configuration for passport
+  app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }))
+  
+  // Initialize passport
+  app.use(passport.initialize())
+  app.use(passport.session())
   
   // Schedule cron job to check expired deadlines every day at midnight
   cron.schedule('0 0 * * *', () => {
