@@ -45,10 +45,10 @@ const Register = () => {
   }
 
   const handleGoogleLogin = () => {
-    // Redirect to backend Google OAuth endpoint via proxy
-    window.location.href = '/api/auth/google'
+    // Use the full backend URL for Google OAuth
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    window.location.href = `${backendUrl}/api/auth/google`
   }
-
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8">
