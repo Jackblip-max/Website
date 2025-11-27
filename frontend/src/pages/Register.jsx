@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
@@ -45,9 +45,8 @@ const Register = () => {
   }
 
   const handleGoogleLogin = () => {
-    // Use the full backend URL without going through the proxy
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-    window.location.href = `${backendUrl}/api/auth/google`
+    // Redirect to backend Google OAuth endpoint via proxy
+    window.location.href = '/api/auth/google'
   }
 
   return (
@@ -58,7 +57,8 @@ const Register = () => {
         <div className="space-y-4 mb-6">
           <button 
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center space-x-3 bg-white border-2 border-gray-300 rounded-lg py-3 hover:bg-gray-50"
+            type="button"
+            className="w-full flex items-center justify-center space-x-3 bg-white border-2 border-gray-300 rounded-lg py-3 hover:bg-gray-50 transition-colors"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -186,6 +186,13 @@ const Register = () => {
             {registerMutation.isPending ? 'Registering...' : t('submit')}
           </button>
         </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{' '}
+          <Link to="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+            {t('login')}
+          </Link>
+        </p>
       </div>
     </div>
   )
