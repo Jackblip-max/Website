@@ -230,7 +230,7 @@ export const completeProfile = async (req, res) => {
         userId: user.id,
         education: education || 'undergraduate',
         skills: skills || '',
-        teamwork: teamwork || false,
+        teamwork: teamwork !== undefined ? teamwork : false,
         motivation: motivation || '',
         notificationsEnabled: true
       })
@@ -256,18 +256,14 @@ export const completeProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Profile completed successfully',
-      user: {
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        phone: updatedUser.phone,
-        role: updatedUser.role,
-        volunteer: updatedUser.volunteer,
-        organization: updatedUser.organization
-      }
+      user: updatedUser
     })
   } catch (error) {
     console.error('Complete profile error:', error)
-    res.status(500).json({ message: 'Failed to complete profile', error: error.message })
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to complete profile', 
+      error: error.message 
+    })
   }
 }
