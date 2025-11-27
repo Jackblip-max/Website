@@ -9,8 +9,7 @@ import { authService } from '../services/authService'
 const CompleteProfile = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const { checkAuth } = useAuth()
-  const { user } = useAuth()
+  const { checkAuth, user } = useAuth()
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -22,15 +21,14 @@ const CompleteProfile = () => {
 
   const completeMutation = useMutation({
     mutationFn: (data) => authService.completeProfile(data),
-    onSuccess: async (response) => {
-      // Update local auth state with new user data
-      if (response.user) {
-        await checkAuth()
-      }
+    onSuccess: async () => {
+      // Update local auth state
+      await checkAuth()
       toast.success('Profile completed successfully!')
       navigate('/')
     },
     onError: (error) => {
+      console.error('Complete profile error:', error)
       toast.error(error.response?.data?.message || 'Failed to complete profile')
     }
   })
@@ -45,18 +43,31 @@ const CompleteProfile = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    
+    // Validate required fields
+    if (!formData.name || !formData.phone) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
     completeMutation.mutate(formData)
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-6">Complete Your Profile</h2>
-        <p className="text-gray-600 mb-6">Please provide additional information to complete your volunteer profile.</p>
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Complete Your Profile</h2>
+          <p className="text-gray-600">
+            Welcome! Please provide additional information to complete your volunteer profile.
+          </p>
+        </div>
         
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('name')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('name')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="name"
@@ -69,7 +80,9 @@ const CompleteProfile = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('phone')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('phone')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="tel"
               name="phone"
@@ -133,7 +146,7 @@ const CompleteProfile = () => {
           <button
             type="submit"
             disabled={completeMutation.isPending}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 transition-colors"
           >
             {completeMutation.isPending ? 'Saving...' : 'Complete Profile'}
           </button>
