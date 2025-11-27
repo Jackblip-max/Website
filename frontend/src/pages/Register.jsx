@@ -45,7 +45,9 @@ const Register = () => {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google`
+    // Use the full backend URL without going through the proxy
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    window.location.href = `${backendUrl}/api/auth/google`
   }
 
   return (
