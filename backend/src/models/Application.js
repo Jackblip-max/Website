@@ -42,4 +42,5 @@ const Application = sequelize.define('Application', {
   ]
 })
 
+export { Application }
 export default Application
