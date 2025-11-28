@@ -34,4 +34,5 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
   ]
 })
 
+export { SavedOpportunity }
 export default SavedOpportunity
