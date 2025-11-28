@@ -19,6 +19,55 @@ const Register = () => {
     teamwork: false,
     motivation: ''
   })
+  const [errors, setErrors] = useState({})
+
+  const validateForm = () => {
+    const newErrors = {}
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required'
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters'
+    } else if (!/^[a-zA-Z\s]+$/.test(formData.name)) {
+      newErrors.name = 'Name can only contain letters and spaces'
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+
+    // Phone validation
+    const cleanPhone = formData.phone.replace(/\s/g, '')
+    if (!cleanPhone) {
+      newErrors.phone = 'Phone number is required'
+    } else if (!/^(\+?95|09)\d{7,10}$/.test(cleanPhone)) {
+      newErrors.phone = 'Please enter a valid Myanmar phone number (e.g., 09xxxxxxxxx)'
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required'
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters'
+    }
+
+    // Skills validation (optional but should be reasonable if provided)
+    if (formData.skills && formData.skills.length > 500) {
+      newErrors.skills = 'Skills description should be under 500 characters'
+    }
+
+    // Motivation validation (optional but should be reasonable if provided)
+    if (formData.motivation && formData.motivation.length > 1000) {
+      newErrors.motivation = 'Motivation should be under 1000 characters'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
@@ -39,21 +88,17 @@ const Register = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     
-    // Validate phone number
-    const phoneRegex = /^(\+?95|09)\d{7,10}$/
-    if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
-      toast.error('Please enter a valid Myanmar phone number')
-      return
-    }
-
-    // Validate password
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters')
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form')
       return
     }
 
@@ -113,9 +158,12 @@ const Register = () => {
               value={formData.name}
               onChange={handleChange}
               placeholder="Your full name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
             />
+            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
           </div>
 
           <div>
@@ -128,9 +176,12 @@ const Register = () => {
               value={formData.email}
               onChange={handleChange}
               placeholder="your.email@example.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
             />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
           <div>
@@ -143,10 +194,13 @@ const Register = () => {
               value={formData.phone}
               onChange={handleChange}
               placeholder="09xxxxxxxxx or +959xxxxxxxxx"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.phone ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>
+            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+            {!errors.phone && <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>}
           </div>
 
           <div>
@@ -159,11 +213,14 @@ const Register = () => {
               value={formData.password}
               onChange={handleChange}
               placeholder="At least 6 characters"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.password ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
               minLength={6}
             />
-            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            {!errors.password && <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>}
           </div>
 
           <div>
@@ -184,16 +241,21 @@ const Register = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('skills')}
+              {t('skills')} (Optional)
             </label>
             <textarea
               name="skills"
               value={formData.skills}
               onChange={handleChange}
               placeholder="e.g., Communication, Leadership, Teaching, Organization..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.skills ? 'border-red-500' : 'border-gray-300'
+              }`}
               rows="3"
+              maxLength={500}
             ></textarea>
+            {errors.skills && <p className="text-red-500 text-xs mt-1">{errors.skills}</p>}
+            <p className="text-xs text-gray-500 mt-1">{formData.skills.length}/500 characters</p>
           </div>
 
           <div className="flex items-center">
@@ -212,16 +274,21 @@ const Register = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('motivation')}
+              {t('motivation')} (Optional)
             </label>
             <textarea
               name="motivation"
               value={formData.motivation}
               onChange={handleChange}
               placeholder="Tell us why you want to volunteer and what motivates you..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.motivation ? 'border-red-500' : 'border-gray-300'
+              }`}
               rows="3"
+              maxLength={1000}
             ></textarea>
+            {errors.motivation && <p className="text-red-500 text-xs mt-1">{errors.motivation}</p>}
+            <p className="text-xs text-gray-500 mt-1">{formData.motivation.length}/1000 characters</p>
           </div>
 
           <button
