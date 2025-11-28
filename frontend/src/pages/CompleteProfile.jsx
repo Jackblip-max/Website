@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -9,19 +9,58 @@ import { authService } from '../services/authService'
 const CompleteProfile = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const { checkAuth, user } = useAuth()
+  const { checkAuth, user, isAuthenticated } = useAuth()
+  const [loading, setLoading] = useState(true)
+  
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    phone: user?.phone || '',
+    name: '',
+    phone: '',
     education: 'undergraduate',
     skills: '',
     teamwork: false,
     motivation: ''
   })
 
+  useEffect(() => {
+    console.log('CompleteProfile mounted')
+    console.log('Is authenticated:', isAuthenticated)
+    console.log('User:', user)
+    
+    if (!isAuthenticated) {
+      console.log('Not authenticated, redirecting to login')
+      toast.error('Please login first')
+      navigate('/login')
+      return
+    }
+    
+    if (user) {
+      console.log('User data available, populating form')
+      setFormData(prev => ({
+        ...prev,
+        name: user.name || '',
+        phone: user.phone || ''
+      }))
+      setLoading(false)
+    } else {
+      // If authenticated but no user data yet, wait a moment
+      const timer = setTimeout(() => {
+        if (!user) {
+          console.log('No user data after timeout, checking auth')
+          checkAuth().then(() => setLoading(false))
+        }
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isAuthenticated, user, navigate, checkAuth])
+
   const completeMutation = useMutation({
-    mutationFn: (data) => authService.completeProfile(data),
-    onSuccess: async () => {
+    mutationFn: (data) => {
+      console.log('Submitting profile data:', data)
+      return authService.completeProfile(data)
+    },
+    onSuccess: async (response) => {
+      console.log('Profile completion response:', response)
       // Update local auth state
       await checkAuth()
       toast.success('Profile completed successfully!')
@@ -29,7 +68,9 @@ const CompleteProfile = () => {
     },
     onError: (error) => {
       console.error('Complete profile error:', error)
-      toast.error(error.response?.data?.message || 'Failed to complete profile')
+      console.error('Error response:', error.response?.data)
+      const message = error.response?.data?.message || 'Failed to complete profile'
+      toast.error(message)
     }
   })
 
@@ -44,13 +85,32 @@ const CompleteProfile = () => {
   const handleSubmit = (e) => {
     e.preventDefault()
     
+    console.log('Form data before validation:', formData)
+    
     // Validate required fields
     if (!formData.name || !formData.phone) {
       toast.error('Please fill in all required fields')
       return
     }
 
+    if (formData.phone.length < 10) {
+      toast.error('Please enter a valid phone number')
+      return
+    }
+
+    console.log('Submitting complete profile with data:', formData)
     completeMutation.mutate(formData)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -92,6 +152,7 @@ const CompleteProfile = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code</p>
           </div>
 
           <div>
