@@ -20,36 +20,54 @@ export const register = async (req, res) => {
 
     // Validate required fields
     if (!name || !email || !phone || !password) {
+      console.log('Missing required fields')
       return res.status(400).json({ 
         success: false,
         message: 'Please provide name, email, phone, and password' 
       })
     }
 
-    // Validate phone format (Myanmar format)
-    const phoneRegex = /^(\+?95|09)\d{7,10}$/
-    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+    // Validate phone format (Myanmar format) - MORE FLEXIBLE
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '') // Remove spaces, dashes, parentheses
+    const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
+    if (!phoneRegex.test(cleanPhone)) {
+      console.log('Invalid phone format:', phone)
       return res.status(400).json({ 
         success: false,
         message: 'Please provide a valid Myanmar phone number' 
       })
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      console.log('Invalid email format:', email)
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      })
+    }
+
     // Check if user exists
     const userExists = await User.findOne({ where: { email } })
     if (userExists) {
+      console.log('User already exists:', email)
       return res.status(400).json({ 
         success: false,
         message: 'User already exists with this email' 
       })
     }
 
-    // Create user
+    // Hash password manually before creating user
+    const hashedPassword = await bcrypt.hash(password, 10)
+    console.log('Password hashed successfully')
+
+    // Create user with hashed password
     const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: cleanPhone,
+      password: hashedPassword, // Use pre-hashed password
       role: 'volunteer',
       isVerified: false
     })
@@ -71,23 +89,27 @@ export const register = async (req, res) => {
     // Generate token
     const token = generateToken(user.id)
 
+    // Return response without password
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role
+    }
+
     res.status(201).json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role
-      }
+      user: userResponse
     })
   } catch (error) {
-    console.error('Register error:', error)
+    console.error('Register error details:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Registration failed. Please try again.',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
   }
 }
@@ -109,7 +131,7 @@ export const login = async (req, res) => {
 
     // Check if user exists
     const user = await User.findOne({ 
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
       include: [
         { model: Volunteer, as: 'volunteer' },
         { model: Organization, as: 'organization' }
@@ -132,7 +154,7 @@ export const login = async (req, res) => {
     }
 
     // Check password
-    const isPasswordValid = await user.comparePassword(password)
+    const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false,
@@ -224,8 +246,11 @@ export const updateProfile = async (req, res) => {
     }
 
     // Update user basic info
-    if (name) user.name = name
-    if (phone) user.phone = phone
+    if (name) user.name = name.trim()
+    if (phone) {
+      const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+      user.phone = cleanPhone
+    }
     await user.save()
 
     // Update volunteer profile if exists
@@ -301,8 +326,9 @@ export const completeProfile = async (req, res) => {
     }
 
     // Update user basic info
-    user.name = name
-    user.phone = phone
+    user.name = name.trim()
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    user.phone = cleanPhone
     await user.save()
 
     console.log('User updated:', user.id)
