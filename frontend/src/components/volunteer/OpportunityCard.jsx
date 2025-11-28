@@ -19,7 +19,7 @@ const OpportunityCard = ({ opportunity }) => {
       isSaved ? volunteerService.unsaveOpportunity(oppId) : volunteerService.saveOpportunity(oppId),
     onSuccess: () => {
       setIsSaved(!isSaved)
-      toast.success(isSaved ? 'Removed from saved' : t('save') + 'd!')
+      toast.success(isSaved ? 'Removed from saved' : 'Saved successfully!')
       queryClient.invalidateQueries(['savedOpportunities'])
     },
     onError: () => {
@@ -88,7 +88,7 @@ const OpportunityCard = ({ opportunity }) => {
   const handleShare = () => {
     const url = `${window.location.origin}/opportunities/${opportunity.id}`
     navigator.clipboard.writeText(url)
-    toast.success(t('copiedLink'))
+    toast.success('Link copied to clipboard!')
   }
 
   const getModeColor = (mode) => {
