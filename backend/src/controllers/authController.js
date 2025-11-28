@@ -209,22 +209,39 @@ export const updateProfile = async (req, res) => {
 // @access  Private
 export const completeProfile = async (req, res) => {
   try {
+    console.log('Complete profile request:', req.body)
+    console.log('User from token:', req.user)
+
     const { name, phone, education, skills, teamwork, motivation } = req.body
+
+    // Validate required fields
+    if (!name || !phone) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Name and phone are required fields' 
+      })
+    }
 
     const user = await User.findByPk(req.user.id)
     if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      })
     }
 
     // Update user basic info
-    if (name) user.name = name
-    if (phone) user.phone = phone
+    user.name = name
+    user.phone = phone
     await user.save()
+
+    console.log('User updated:', user.id)
 
     // Update or create volunteer profile
     let volunteer = await Volunteer.findOne({ where: { userId: user.id } })
     
     if (!volunteer) {
+      console.log('Creating new volunteer profile')
       // Create new volunteer profile
       volunteer = await Volunteer.create({
         userId: user.id,
@@ -235,6 +252,7 @@ export const completeProfile = async (req, res) => {
         notificationsEnabled: true
       })
     } else {
+      console.log('Updating existing volunteer profile')
       // Update existing volunteer profile
       await volunteer.update({
         education: education || volunteer.education,
@@ -253,10 +271,21 @@ export const completeProfile = async (req, res) => {
       attributes: { exclude: ['password'] }
     })
 
+    console.log('Profile completed successfully for user:', updatedUser.id)
+
     res.json({
       success: true,
       message: 'Profile completed successfully',
-      user: updatedUser
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        volunteer: updatedUser.volunteer,
+        organization: updatedUser.organization,
+        organizationId: updatedUser.organization?.id
+      }
     })
   } catch (error) {
     console.error('Complete profile error:', error)
