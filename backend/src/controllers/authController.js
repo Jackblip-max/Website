@@ -14,12 +14,34 @@ const generateToken = (id) => {
 // @access  Public
 export const register = async (req, res) => {
   try {
+    console.log('Registration request received:', { ...req.body, password: '***' })
+    
     const { name, email, phone, password, education, skills, teamwork, motivation } = req.body
+
+    // Validate required fields
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide name, email, phone, and password' 
+      })
+    }
+
+    // Validate phone format (Myanmar format)
+    const phoneRegex = /^(\+?95|09)\d{7,10}$/
+    if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide a valid Myanmar phone number' 
+      })
+    }
 
     // Check if user exists
     const userExists = await User.findOne({ where: { email } })
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' })
+      return res.status(400).json({ 
+        success: false,
+        message: 'User already exists with this email' 
+      })
     }
 
     // Create user
@@ -32,6 +54,8 @@ export const register = async (req, res) => {
       isVerified: false
     })
 
+    console.log('User created successfully:', user.id)
+
     // Create volunteer profile
     await Volunteer.create({
       userId: user.id,
@@ -41,6 +65,8 @@ export const register = async (req, res) => {
       motivation: motivation || '',
       notificationsEnabled: true
     })
+
+    console.log('Volunteer profile created successfully')
 
     // Generate token
     const token = generateToken(user.id)
@@ -58,7 +84,11 @@ export const register = async (req, res) => {
     })
   } catch (error) {
     console.error('Register error:', error)
-    res.status(500).json({ message: 'Registration failed', error: error.message })
+    res.status(500).json({ 
+      success: false,
+      message: 'Registration failed. Please try again.',
+      error: error.message 
+    })
   }
 }
 
@@ -68,6 +98,14 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please provide email and password' 
+      })
+    }
 
     // Check if user exists
     const user = await User.findOne({ 
@@ -79,13 +117,27 @@ export const login = async (req, res) => {
     })
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' })
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid email or password' 
+      })
+    }
+
+    // Check if user has a password (not OAuth user)
+    if (!user.password) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'This account uses Google sign-in. Please login with Google.' 
+      })
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(password)
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' })
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid email or password' 
+      })
     }
 
     // Generate token
@@ -107,7 +159,11 @@ export const login = async (req, res) => {
     })
   } catch (error) {
     console.error('Login error:', error)
-    res.status(500).json({ message: 'Login failed', error: error.message })
+    res.status(500).json({ 
+      success: false,
+      message: 'Login failed. Please try again.',
+      error: error.message 
+    })
   }
 }
 
@@ -125,7 +181,10 @@ export const getProfile = async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      })
     }
 
     res.json({
@@ -141,7 +200,11 @@ export const getProfile = async (req, res) => {
     })
   } catch (error) {
     console.error('Get profile error:', error)
-    res.status(500).json({ message: 'Failed to get profile', error: error.message })
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to get profile',
+      error: error.message 
+    })
   }
 }
 
@@ -154,7 +217,10 @@ export const updateProfile = async (req, res) => {
 
     const user = await User.findByPk(req.user.id)
     if (!user) {
-      return res.status(404).json({ message: 'User not found' })
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      })
     }
 
     // Update user basic info
@@ -200,7 +266,11 @@ export const updateProfile = async (req, res) => {
     })
   } catch (error) {
     console.error('Update profile error:', error)
-    res.status(500).json({ message: 'Failed to update profile', error: error.message })
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to update profile',
+      error: error.message 
+    })
   }
 }
 
@@ -242,7 +312,6 @@ export const completeProfile = async (req, res) => {
     
     if (!volunteer) {
       console.log('Creating new volunteer profile')
-      // Create new volunteer profile
       volunteer = await Volunteer.create({
         userId: user.id,
         education: education || 'undergraduate',
@@ -253,7 +322,6 @@ export const completeProfile = async (req, res) => {
       })
     } else {
       console.log('Updating existing volunteer profile')
-      // Update existing volunteer profile
       await volunteer.update({
         education: education || volunteer.education,
         skills: skills !== undefined ? skills : volunteer.skills,
