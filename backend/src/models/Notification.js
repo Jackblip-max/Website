@@ -32,4 +32,5 @@ const Notification = sequelize.define('Notification', {
   timestamps: true
 })
 
+export { Notification }
 export default Notification
