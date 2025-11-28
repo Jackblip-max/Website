@@ -41,4 +41,5 @@ const Organization = sequelize.define('Organization', {
   timestamps: true
 })
 
+export { Organization }
 export default Organization
