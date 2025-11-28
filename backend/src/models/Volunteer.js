@@ -40,4 +40,5 @@ const Volunteer = sequelize.define('Volunteer', {
   timestamps: true
 })
 
+export { Volunteer }
 export default Volunteer
