@@ -38,30 +38,53 @@ router.post('/profile-photo', authenticate, upload.single('photo'), async (req, 
 
 // Google OAuth routes
 router.get('/google',
+  (req, res, next) => {
+    console.log('Initiating Google OAuth flow')
+    next()
+  },
   passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
+    scope: ['profile', 'email'],
+    prompt: 'select_account'
   })
 )
 
 router.get('/google/callback',
+  (req, res, next) => {
+    console.log('Google callback route hit')
+    next()
+  },
   passport.authenticate('google', { 
     failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`,
     session: false 
   }),
   (req, res) => {
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: req.user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    )
+    try {
+      console.log('Google OAuth successful, generating JWT')
+      console.log('User:', req.user?.email)
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: req.user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      )
 
-    // Check if user needs to complete profile (for Google OAuth users)
-    const needsProfile = !req.user.phone || !req.user.volunteer?.education
-    
-    // Redirect to frontend with token and profile completion flag
-    const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&needsProfile=${needsProfile}`
-    res.redirect(redirectUrl)
+      // Check if user needs to complete profile
+      // User needs profile if they don't have phone number
+      const needsProfile = !req.user.phone
+      
+      console.log('User needs profile completion:', needsProfile)
+      console.log('User has phone:', !!req.user.phone)
+      
+      // Redirect to frontend with token and profile completion flag
+      const redirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}&needsProfile=${needsProfile}`
+      console.log('Redirecting to:', redirectUrl)
+      
+      res.redirect(redirectUrl)
+    } catch (error) {
+      console.error('Error in Google callback:', error)
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=server_error`)
+    }
   }
 )
 
