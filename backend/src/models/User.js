@@ -44,21 +44,13 @@ const User = sequelize.define('User', {
 }, {
   tableName: 'users',
   timestamps: true,
-  hooks: {
-    beforeCreate: async (user) => {
-      if (user.password) {
-        user.password = await bcrypt.hash(user.password, 10)
-      }
-    },
-    beforeUpdate: async (user) => {
-      if (user.changed('password') && user.password) {
-        user.password = await bcrypt.hash(user.password, 10)
-      }
-    }
-  }
+  // REMOVE THE HOOKS - we'll hash passwords manually in the controller
+  hooks: {}
 })
 
+// Keep the comparePassword method for login
 User.prototype.comparePassword = async function(candidatePassword) {
+  if (!this.password) return false
   return await bcrypt.compare(candidatePassword, this.password)
 }
 
