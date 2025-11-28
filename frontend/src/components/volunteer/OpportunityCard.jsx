@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MapPin, Calendar, Clock, Bookmark, Share2 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -7,6 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 import { volunteerService } from '../../services/volunteerService'
 
 const OpportunityCard = ({ opportunity }) => {
+  const navigate = useNavigate()
   const { t } = useLanguage()
   const { isAuthenticated } = useAuth()
   const queryClient = useQueryClient()
@@ -19,20 +21,28 @@ const OpportunityCard = ({ opportunity }) => {
       setIsSaved(!isSaved)
       toast.success(isSaved ? 'Removed from saved' : t('save') + 'd!')
       queryClient.invalidateQueries(['savedOpportunities'])
+    },
+    onError: () => {
+      toast.error('Failed to save opportunity')
     }
   })
 
   const applyMutation = useMutation({
     mutationFn: (oppId) => volunteerService.applyToOpportunity(oppId),
     onSuccess: () => {
-      toast.success('Application submitted successfully!')
+      toast.success('Application submitted successfully! 🎉')
       queryClient.invalidateQueries(['applications'])
+    },
+    onError: (error) => {
+      const message = error.response?.data?.message || 'Failed to submit application'
+      toast.error(message)
     }
   })
 
   const handleSave = () => {
     if (!isAuthenticated) {
       toast.error('Please login to save opportunities')
+      setTimeout(() => navigate('/login'), 1500)
       return
     }
     saveMutation.mutate(opportunity.id)
@@ -40,7 +50,36 @@ const OpportunityCard = ({ opportunity }) => {
 
   const handleApply = () => {
     if (!isAuthenticated) {
-      toast.error('Please login to apply')
+      toast((t) => (
+        <div className="flex flex-col">
+          <p className="font-semibold mb-2">Please register or login to apply</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                toast.dismiss(t.id)
+                navigate('/register')
+              }}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+            >
+              Register
+            </button>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id)
+                navigate('/login')
+              }}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Login
+            </button>
+          </div>
+        </div>
+      ), {
+        duration: 5000,
+        style: {
+          minWidth: '300px',
+        },
+      })
       return
     }
     applyMutation.mutate(opportunity.id)
@@ -94,24 +133,26 @@ const OpportunityCard = ({ opportunity }) => {
           <button
             onClick={handleApply}
             disabled={applyMutation.isPending}
-            className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
+            className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {applyMutation.isPending ? 'Applying...' : t('apply')}
           </button>
           <button
             onClick={handleSave}
             disabled={saveMutation.isPending}
-            className={`p-2 rounded-lg border-2 ${
+            className={`p-2 rounded-lg border-2 transition-colors ${
               isSaved
                 ? 'bg-emerald-100 border-emerald-600 text-emerald-600'
                 : 'border-gray-300 text-gray-600 hover:border-emerald-600'
             }`}
+            title={isSaved ? 'Unsave' : 'Save for later'}
           >
             <Bookmark className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} />
           </button>
           <button
             onClick={handleShare}
-            className="p-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:border-emerald-600"
+            className="p-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:border-emerald-600 transition-colors"
+            title="Share this opportunity"
           >
             <Share2 className="w-5 h-5" />
           </button>
