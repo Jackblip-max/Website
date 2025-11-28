@@ -60,4 +60,5 @@ const Opportunity = sequelize.define('Opportunity', {
   timestamps: true
 })
 
+export { Opportunity }
 export default Opportunity
