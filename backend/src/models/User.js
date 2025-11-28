@@ -44,7 +44,6 @@ const User = sequelize.define('User', {
 }, {
   tableName: 'users',
   timestamps: true,
-  // REMOVE THE HOOKS - we'll hash passwords manually in the controller
   hooks: {}
 })
 
@@ -54,4 +53,5 @@ User.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password)
 }
 
+export { User }
 export default User
