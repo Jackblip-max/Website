@@ -23,11 +23,13 @@ const Register = () => {
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
     onSuccess: () => {
-      toast.success('Registration successful!')
+      toast.success('Registration successful! Welcome to MyanVolunteer!')
       navigate('/')
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Registration failed')
+      console.error('Registration error:', error)
+      const message = error.response?.data?.message || 'Registration failed. Please try again.'
+      toast.error(message)
     }
   })
 
@@ -41,20 +43,41 @@ const Register = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    
+    // Validate phone number
+    const phoneRegex = /^(\+?95|09)\d{7,10}$/
+    if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
+      toast.error('Please enter a valid Myanmar phone number')
+      return
+    }
+
+    // Validate password
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+
+    console.log('Submitting registration:', { ...formData, password: '***' })
     registerMutation.mutate(formData)
   }
 
   const handleGoogleLogin = () => {
-    // Use the full backend URL for Google OAuth
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     window.location.href = `${backendUrl}/api/auth/google`
   }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-6">{t('registerTitle')}</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+          {t('registerTitle')}
+        </h2>
+        <p className="text-center text-gray-600 mb-6">
+          Create your account to start volunteering
+        </p>
         
-        <div className="space-y-4 mb-6">
+        {/* Google Sign Up */}
+        <div className="mb-6">
           <button 
             onClick={handleGoogleLogin}
             type="button"
@@ -81,56 +104,72 @@ const Register = () => {
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('name')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('name')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
+              placeholder="Your full name"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('email')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('email')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
+              placeholder="your.email@example.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('phone')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('phone')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="tel"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
+              placeholder="09xxxxxxxxx or +959xxxxxxxxx"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('password')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('password')} <span className="text-red-500">*</span>
+            </label>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
+              placeholder="At least 6 characters"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
               minLength={6}
             />
+            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('education')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('education')}
+            </label>
             <select
               name="education"
               value={formData.education}
@@ -144,12 +183,14 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('skills')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('skills')}
+            </label>
             <textarea
               name="skills"
               value={formData.skills}
               onChange={handleChange}
-              placeholder="e.g., Communication, Leadership, Teaching..."
+              placeholder="e.g., Communication, Leadership, Teaching, Organization..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               rows="3"
             ></textarea>
@@ -159,20 +200,25 @@ const Register = () => {
             <input
               type="checkbox"
               name="teamwork"
+              id="teamwork"
               checked={formData.teamwork}
               onChange={handleChange}
               className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
             />
-            <label className="ml-2 text-sm text-gray-700">{t('teamwork')}</label>
+            <label htmlFor="teamwork" className="ml-2 text-sm text-gray-700">
+              {t('teamwork')}
+            </label>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('motivation')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('motivation')}
+            </label>
             <textarea
               name="motivation"
               value={formData.motivation}
               onChange={handleChange}
-              placeholder="Tell us why you want to volunteer..."
+              placeholder="Tell us why you want to volunteer and what motivates you..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               rows="3"
             ></textarea>
@@ -181,13 +227,21 @@ const Register = () => {
           <button
             type="submit"
             disabled={registerMutation.isPending}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {registerMutation.isPending ? 'Registering...' : t('submit')}
+            {registerMutation.isPending ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating account...
+              </span>
+            ) : t('submit')}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
           <Link to="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
             {t('login')}
