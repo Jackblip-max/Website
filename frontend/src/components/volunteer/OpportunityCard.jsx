@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, Calendar, Clock, Bookmark, Share2 } from 'lucide-react'
+import { MapPin, Calendar, Clock, Bookmark, Share2, AlertCircle } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../../context/LanguageContext'
@@ -50,38 +50,47 @@ const OpportunityCard = ({ opportunity }) => {
 
   const handleApply = () => {
     if (!isAuthenticated) {
-      toast((t) => (
-        <div className="flex flex-col">
-          <p className="font-semibold mb-2">Please register or login to apply</p>
+      // Show custom toast with register/login options
+      toast((toastInstance) => (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-gray-900 mb-1">Login Required</p>
+              <p className="text-sm text-gray-600">Please create an account or login to apply for volunteer opportunities</p>
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => {
-                toast.dismiss(t.id)
+                toast.dismiss(toastInstance.id)
                 navigate('/register')
               }}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+              className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium transition-colors"
             >
-              Register
+              Create Account
             </button>
             <button
               onClick={() => {
-                toast.dismiss(t.id)
+                toast.dismiss(toastInstance.id)
                 navigate('/login')
               }}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium transition-colors"
             >
               Login
             </button>
           </div>
         </div>
       ), {
-        duration: 5000,
+        duration: 6000,
         style: {
-          minWidth: '300px',
+          minWidth: '350px',
+          maxWidth: '450px',
         },
       })
       return
     }
+    
     applyMutation.mutate(opportunity.id)
   }
 
@@ -129,26 +138,44 @@ const OpportunityCard = ({ opportunity }) => {
           <span>{opportunity.timeCommitment}</span>
         </div>
 
+        {!isAuthenticated && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Note:</span> You must be registered to apply for opportunities
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
             onClick={handleApply}
             disabled={applyMutation.isPending}
-            className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
+              isAuthenticated
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'bg-amber-500 text-white hover:bg-amber-600'
+            }`}
+            title={!isAuthenticated ? 'Click to register or login' : 'Apply for this opportunity'}
           >
-            {applyMutation.isPending ? 'Applying...' : t('apply')}
+            {applyMutation.isPending ? 'Applying...' : isAuthenticated ? t('apply') : 'Register to Apply'}
           </button>
+          
           <button
             onClick={handleSave}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || !isAuthenticated}
             className={`p-2 rounded-lg border-2 transition-colors ${
-              isSaved
+              !isAuthenticated
+                ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                : isSaved
                 ? 'bg-emerald-100 border-emerald-600 text-emerald-600'
                 : 'border-gray-300 text-gray-600 hover:border-emerald-600'
             }`}
-            title={isSaved ? 'Unsave' : 'Save for later'}
+            title={!isAuthenticated ? 'Login to save opportunities' : isSaved ? 'Unsave' : 'Save for later'}
           >
             <Bookmark className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} />
           </button>
+          
           <button
             onClick={handleShare}
             className="p-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:border-emerald-600 transition-colors"
