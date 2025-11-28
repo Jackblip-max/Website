@@ -5,6 +5,10 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+console.log('Initializing Passport with Google OAuth')
+console.log('Client ID exists:', !!process.env.GOOGLE_CLIENT_ID)
+console.log('Callback URL:', process.env.GOOGLE_CALLBACK_URL)
+
 // Configure Google OAuth Strategy
 passport.use(
   new GoogleStrategy(
@@ -15,7 +19,16 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        console.log('Google OAuth callback received for:', profile.emails[0].value)
+        console.log('Google OAuth callback received')
+        console.log('Profile email:', profile.emails?.[0]?.value)
+        console.log('Profile ID:', profile.id)
+        
+        const email = profile.emails?.[0]?.value
+        
+        if (!email) {
+          console.error('No email in Google profile')
+          return done(new Error('No email provided by Google'), null)
+        }
         
         // Check if user already exists with Google ID
         let user = await User.findOne({ 
@@ -24,13 +37,13 @@ passport.use(
         })
 
         if (user) {
-          console.log('Existing user found:', user.email)
+          console.log('Existing user found with Google ID:', user.email)
           return done(null, user)
         }
 
         // Check if user exists with same email
         user = await User.findOne({ 
-          where: { email: profile.emails[0].value },
+          where: { email },
           include: [{ model: Volunteer, as: 'volunteer' }]
         })
 
@@ -39,18 +52,26 @@ passport.use(
           console.log('Linking Google account to existing user:', user.email)
           user.googleId = profile.id
           await user.save()
+          
+          // Reload user with associations
+          user = await User.findByPk(user.id, {
+            include: [{ model: Volunteer, as: 'volunteer' }]
+          })
+          
           return done(null, user)
         }
 
         // Create new user
-        console.log('Creating new user:', profile.emails[0].value)
+        console.log('Creating new user:', email)
         user = await User.create({
-          name: profile.displayName,
-          email: profile.emails[0].value,
+          name: profile.displayName || email.split('@')[0],
+          email,
           googleId: profile.id,
           role: 'volunteer',
           isVerified: true
         })
+
+        console.log('New user created with ID:', user.id)
 
         // Create volunteer profile with default values
         await Volunteer.create({
@@ -62,12 +83,14 @@ passport.use(
           notificationsEnabled: true
         })
 
+        console.log('Volunteer profile created for user:', user.id)
+
         // Fetch user with volunteer data
         user = await User.findByPk(user.id, {
           include: [{ model: Volunteer, as: 'volunteer' }]
         })
 
-        console.log('New user created successfully:', user.email)
+        console.log('New user setup complete:', user.email)
         return done(null, user)
       } catch (error) {
         console.error('Google OAuth error:', error)
@@ -79,17 +102,26 @@ passport.use(
 
 // Serialize user for the session
 passport.serializeUser((user, done) => {
+  console.log('Serializing user:', user.id)
   done(null, user.id)
 })
 
 // Deserialize user from the session
 passport.deserializeUser(async (id, done) => {
   try {
+    console.log('Deserializing user:', id)
     const user = await User.findByPk(id, {
       include: [{ model: Volunteer, as: 'volunteer' }]
     })
+    
+    if (!user) {
+      console.error('User not found during deserialization:', id)
+      return done(new Error('User not found'), null)
+    }
+    
     done(null, user)
   } catch (error) {
+    console.error('Deserialization error:', error)
     done(error, null)
   }
 })
