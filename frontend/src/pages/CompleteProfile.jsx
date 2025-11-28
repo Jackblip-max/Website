@@ -11,6 +11,7 @@ const CompleteProfile = () => {
   const { t } = useLanguage()
   const { checkAuth, user, isAuthenticated } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [errors, setErrors] = useState({})
   
   const [formData, setFormData] = useState({
     name: '',
@@ -42,7 +43,6 @@ const CompleteProfile = () => {
       }))
       setLoading(false)
     } else {
-      // If authenticated but no user data yet, wait a moment
       const timer = setTimeout(() => {
         if (!user) {
           console.log('No user data after timeout, checking auth')
@@ -54,6 +54,40 @@ const CompleteProfile = () => {
     }
   }, [isAuthenticated, user, navigate, checkAuth])
 
+  const validateForm = () => {
+    const newErrors = {}
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required'
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters'
+    } else if (!/^[a-zA-Z\s]+$/.test(formData.name)) {
+      newErrors.name = 'Name can only contain letters and spaces'
+    }
+
+    // Phone validation
+    const cleanPhone = formData.phone.replace(/\s/g, '')
+    if (!cleanPhone) {
+      newErrors.phone = 'Phone number is required'
+    } else if (!/^(\+?95|09)\d{7,10}$/.test(cleanPhone)) {
+      newErrors.phone = 'Please enter a valid Myanmar phone number'
+    }
+
+    // Skills validation (optional but reasonable)
+    if (formData.skills && formData.skills.length > 500) {
+      newErrors.skills = 'Skills description should be under 500 characters'
+    }
+
+    // Motivation validation (optional but reasonable)
+    if (formData.motivation && formData.motivation.length > 1000) {
+      newErrors.motivation = 'Motivation should be under 1000 characters'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const completeMutation = useMutation({
     mutationFn: (data) => {
       console.log('Submitting profile data:', data)
@@ -61,7 +95,6 @@ const CompleteProfile = () => {
     },
     onSuccess: async (response) => {
       console.log('Profile completion response:', response)
-      // Update local auth state
       await checkAuth()
       toast.success('Profile completed successfully!')
       navigate('/')
@@ -80,6 +113,10 @@ const CompleteProfile = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
   }
 
   const handleSubmit = (e) => {
@@ -87,14 +124,8 @@ const CompleteProfile = () => {
     
     console.log('Form data before validation:', formData)
     
-    // Validate required fields
-    if (!formData.name || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
-    }
-
-    if (formData.phone.length < 10) {
-      toast.error('Please enter a valid phone number')
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form')
       return
     }
 
@@ -134,9 +165,12 @@ const CompleteProfile = () => {
               value={formData.name}
               onChange={handleChange}
               placeholder="Full Name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
             />
+            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
           </div>
 
           <div>
@@ -148,11 +182,14 @@ const CompleteProfile = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              placeholder="+95 9xxxxxxxxx"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              placeholder="+95 9xxxxxxxxx or 09xxxxxxxxx"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.phone ? 'border-red-500' : 'border-gray-300'
+              }`}
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code</p>
+            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+            {!errors.phone && <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code</p>}
           </div>
 
           <div>
@@ -170,38 +207,49 @@ const CompleteProfile = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('skills')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('skills')} (Optional)</label>
             <textarea
               name="skills"
               value={formData.skills}
               onChange={handleChange}
               placeholder="e.g., Communication, Leadership, Teaching..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.skills ? 'border-red-500' : 'border-gray-300'
+              }`}
               rows="3"
+              maxLength={500}
             ></textarea>
+            {errors.skills && <p className="text-red-500 text-xs mt-1">{errors.skills}</p>}
+            <p className="text-xs text-gray-500 mt-1">{formData.skills.length}/500 characters</p>
           </div>
 
           <div className="flex items-center">
             <input
               type="checkbox"
               name="teamwork"
+              id="teamwork"
               checked={formData.teamwork}
               onChange={handleChange}
               className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
             />
-            <label className="ml-2 text-sm text-gray-700">{t('teamwork')}</label>
+            <label htmlFor="teamwork" className="ml-2 text-sm text-gray-700">{t('teamwork')}</label>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('motivation')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('motivation')} (Optional)</label>
             <textarea
               name="motivation"
               value={formData.motivation}
               onChange={handleChange}
               placeholder="Tell us why you want to volunteer..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                errors.motivation ? 'border-red-500' : 'border-gray-300'
+              }`}
               rows="3"
+              maxLength={1000}
             ></textarea>
+            {errors.motivation && <p className="text-red-500 text-xs mt-1">{errors.motivation}</p>}
+            <p className="text-xs text-gray-500 mt-1">{formData.motivation.length}/1000 characters</p>
           </div>
 
           <button
