@@ -27,14 +27,29 @@ export const register = async (req, res) => {
       })
     }
 
-    // Validate phone format (Myanmar format) - MORE FLEXIBLE
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '') // Remove spaces, dashes, parentheses
+    // Validate name
+    if (name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be at least 2 characters'
+      })
+    }
+
+    if (!/^[a-zA-Z\s]+$/.test(name)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name can only contain letters and spaces'
+      })
+    }
+
+    // Validate phone format (Myanmar format)
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
     if (!phoneRegex.test(cleanPhone)) {
       console.log('Invalid phone format:', phone)
       return res.status(400).json({ 
         success: false,
-        message: 'Please provide a valid Myanmar phone number' 
+        message: 'Please provide a valid Myanmar phone number (e.g., 09xxxxxxxxx or +959xxxxxxxxx)' 
       })
     }
 
@@ -48,8 +63,16 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if user exists
-    const userExists = await User.findOne({ where: { email } })
+    // Validate password strength
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      })
+    }
+
+    // Check if user exists with this email
+    const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
     if (userExists) {
       console.log('User already exists:', email)
       return res.status(400).json({ 
@@ -58,8 +81,18 @@ export const register = async (req, res) => {
       })
     }
 
-    // Hash password manually before creating user
-    const hashedPassword = await bcrypt.hash(password, 10)
+    // Check if phone number already exists
+    const phoneExists = await User.findOne({ where: { phone: cleanPhone } })
+    if (phoneExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'This phone number is already registered'
+      })
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(password, salt)
     console.log('Password hashed successfully')
 
     // Create user with hashed password
@@ -67,7 +100,7 @@ export const register = async (req, res) => {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: cleanPhone,
-      password: hashedPassword, // Use pre-hashed password
+      password: hashedPassword,
       role: 'volunteer',
       isVerified: false
     })
@@ -95,7 +128,14 @@ export const register = async (req, res) => {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      role: user.role
+      role: user.role,
+      volunteer: {
+        education: education || 'undergraduate',
+        skills: skills || '',
+        teamwork: teamwork || false,
+        motivation: motivation || '',
+        notificationsEnabled: true
+      }
     }
 
     res.status(201).json({
@@ -145,7 +185,7 @@ export const login = async (req, res) => {
       })
     }
 
-    // Check if user has a password (not OAuth user)
+    // Check if user has a password (not OAuth-only user)
     if (!user.password) {
       return res.status(401).json({ 
         success: false,
@@ -184,7 +224,7 @@ export const login = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Login failed. Please try again.',
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
   }
 }
@@ -246,11 +286,28 @@ export const updateProfile = async (req, res) => {
     }
 
     // Update user basic info
-    if (name) user.name = name.trim()
+    if (name) {
+      if (name.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be at least 2 characters'
+        })
+      }
+      user.name = name.trim()
+    }
+    
     if (phone) {
       const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+      const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
+      if (!phoneRegex.test(cleanPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid Myanmar phone number'
+        })
+      }
       user.phone = cleanPhone
     }
+    
     await user.save()
 
     // Update volunteer profile if exists
@@ -317,6 +374,24 @@ export const completeProfile = async (req, res) => {
       })
     }
 
+    // Validate name
+    if (name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be at least 2 characters'
+      })
+    }
+
+    // Validate phone
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
+    if (!phoneRegex.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid Myanmar phone number'
+      })
+    }
+
     const user = await User.findByPk(req.user.id)
     if (!user) {
       return res.status(404).json({ 
@@ -327,7 +402,6 @@ export const completeProfile = async (req, res) => {
 
     // Update user basic info
     user.name = name.trim()
-    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     user.phone = cleanPhone
     await user.save()
 
