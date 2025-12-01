@@ -38,12 +38,25 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
+      console.log('🔑 AuthContext: Starting login process')
+      console.log('🔑 AuthContext: Calling authService.login')
+      
       const response = await authService.login(credentials)
+      
+      console.log('🔑 AuthContext: Login response received:', response)
+      console.log('🔑 AuthContext: Token:', response.token ? 'exists' : 'missing')
+      console.log('🔑 AuthContext: User:', response.user)
+      
       localStorage.setItem('token', response.token)
       setUser(response.user)
       setIsAuthenticated(true)
+      
+      console.log('🔑 AuthContext: Login complete, state updated')
+      
       return response
     } catch (error) {
+      console.error('🔑 AuthContext: Login failed:', error)
+      console.error('🔑 AuthContext: Error details:', error.response?.data)
       throw error
     }
   }
