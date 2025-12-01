@@ -159,17 +159,21 @@ export const register = async (req, res) => {
 // @access  Public
 export const login = async (req, res) => {
   try {
+    console.log('🔐 Login attempt:', { email: req.body.email })
+    
     const { email, password } = req.body
 
     // Validate input
     if (!email || !password) {
+      console.log('🔐 Missing credentials')
       return res.status(400).json({ 
         success: false,
         message: 'Please provide email and password' 
       })
     }
 
-    // Check if user exists
+    // Check if user exists - IMPORTANT: Don't exclude password from query
+    console.log('🔐 Searching for user:', email.trim().toLowerCase())
     const user = await User.findOne({ 
       where: { email: email.trim().toLowerCase() },
       include: [
@@ -179,48 +183,69 @@ export const login = async (req, res) => {
     })
 
     if (!user) {
+      console.log('🔐 User not found')
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
       })
     }
 
+    console.log('🔐 User found:', user.id)
+    console.log('🔐 User has password:', !!user.password)
+
     // Check if user has a password (not OAuth-only user)
     if (!user.password) {
+      console.log('🔐 User has no password (OAuth account)')
       return res.status(401).json({ 
         success: false,
         message: 'This account uses Google sign-in. Please login with Google.' 
       })
     }
 
-    // Check password
+    // Check password using bcrypt.compare directly
+    console.log('🔐 Comparing passwords...')
+    console.log('🔐 Input password length:', password.length)
+    console.log('🔐 Stored hash length:', user.password.length)
+    
     const isPasswordValid = await bcrypt.compare(password, user.password)
+    console.log('🔐 Password valid:', isPasswordValid)
+    
     if (!isPasswordValid) {
+      console.log('🔐 Invalid password')
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
       })
     }
 
+    console.log('🔐 Password validated successfully')
+
     // Generate token
     const token = generateToken(user.id)
+    console.log('🔐 Token generated')
+
+    // Prepare user response (exclude password)
+    const userResponse = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      volunteer: user.volunteer,
+      organization: user.organization,
+      organizationId: user.organization?.id
+    }
+
+    console.log('🔐 Login successful for user:', user.id)
 
     res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        volunteer: user.volunteer,
-        organization: user.organization,
-        organizationId: user.organization?.id
-      }
+      user: userResponse
     })
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('🔐 Login error:', error)
+    console.error('🔐 Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Login failed. Please try again.',
