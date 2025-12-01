@@ -6,7 +6,15 @@ export const authService = {
   },
 
   login: async (credentials) => {
-    return await api.post('/auth/login', credentials)
+    console.log('🌐 authService: Login called with:', credentials.email)
+    try {
+      const response = await api.post('/auth/login', credentials)
+      console.log('🌐 authService: Response received:', response)
+      return response
+    } catch (error) {
+      console.error('🌐 authService: Login error:', error)
+      throw error
+    }
   },
 
   googleAuth: async (token) => {
