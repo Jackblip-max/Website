@@ -389,21 +389,13 @@ export const completeProfile = async (req, res) => {
     console.log('Complete profile request:', req.body)
     console.log('User from token:', req.user)
 
-    const { name, phone, education, skills, teamwork, motivation } = req.body
+    const { phone, education, skills, teamwork, motivation } = req.body
 
-    // Validate required fields
-    if (!name || !phone) {
+    // Validate required fields - only phone is required now
+    if (!phone) {
       return res.status(400).json({ 
         success: false,
-        message: 'Name and phone are required fields' 
-      })
-    }
-
-    // Validate name
-    if (name.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name must be at least 2 characters'
+        message: 'Phone number is required' 
       })
     }
 
@@ -425,8 +417,7 @@ export const completeProfile = async (req, res) => {
       })
     }
 
-    // Update user basic info
-    user.name = name.trim()
+    // Update user phone
     user.phone = cleanPhone
     await user.save()
 
