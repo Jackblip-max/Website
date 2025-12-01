@@ -16,8 +16,6 @@ const Profile = () => {
     phone: user?.phone || '',
     education: user?.volunteer?.education || 'undergraduate',
     skills: user?.volunteer?.skills || '',
-    teamwork: user?.volunteer?.teamwork || false,
-    motivation: user?.volunteer?.motivation || '',
     notificationsEnabled: user?.volunteer?.notificationsEnabled || true
   })
 
@@ -53,8 +51,6 @@ const Profile = () => {
       phone: user?.phone || '',
       education: user?.volunteer?.education || 'undergraduate',
       skills: user?.volunteer?.skills || '',
-      teamwork: user?.volunteer?.teamwork || false,
-      motivation: user?.volunteer?.motivation || '',
       notificationsEnabled: user?.volunteer?.notificationsEnabled || true
     })
     setIsEditing(false)
@@ -133,18 +129,6 @@ const Profile = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Teamwork</label>
-                    <p className="text-lg text-gray-900">
-                      {user.volunteer.teamwork ? '✓ Works well with others' : 'Prefers individual work'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-1">{t('motivation')}</label>
-                    <p className="text-lg text-gray-900">{user.volunteer.motivation || 'Not specified'}</p>
-                  </div>
-
-                  <div>
                     <label className="block text-sm font-medium text-gray-500 mb-1">Notifications</label>
                     <p className="text-lg text-gray-900">
                       {user.volunteer.notificationsEnabled ? '✓ Enabled' : '✗ Disabled'}
@@ -214,32 +198,6 @@ const Profile = () => {
                     value={formData.skills}
                     onChange={handleChange}
                     placeholder="e.g., Communication, Leadership, Teaching..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    rows="3"
-                  ></textarea>
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="teamwork"
-                    id="teamwork"
-                    checked={formData.teamwork}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                  />
-                  <label htmlFor="teamwork" className="ml-2 text-sm text-gray-700">
-                    {t('teamwork')}
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('motivation')}</label>
-                  <textarea
-                    name="motivation"
-                    value={formData.motivation}
-                    onChange={handleChange}
-                    placeholder="Tell us why you want to volunteer..."
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     rows="3"
                   ></textarea>
