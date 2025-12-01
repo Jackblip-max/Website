@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -13,15 +14,46 @@ const Login = () => {
     email: '',
     password: ''
   })
+  const [showPassword, setShowPassword] = useState(false)
 
   const loginMutation = useMutation({
-    mutationFn: (data) => login(data),
-    onSuccess: () => {
+    mutationFn: async (data) => {
+      console.log('🔐 Attempting login with:', { email: data.email, password: '***' })
+      console.log('🔐 Login function:', typeof login)
+      
+      try {
+        const result = await login(data)
+        console.log('🔐 Login function returned:', result)
+        return result
+      } catch (error) {
+        console.error('🔐 Login function threw error:', error)
+        throw error
+      }
+    },
+    onSuccess: async (response) => {
+      console.log('✅ Login successful - Response:', response)
+      console.log('✅ User data:', response?.user)
+      console.log('✅ Token:', response?.token ? 'Token received' : 'No token')
+      
       toast.success('Login successful!')
+      
+      // Add a small delay so we can see the console
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       navigate('/')
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Login failed')
+      console.error('❌ Login error FULL:', error)
+      console.error('❌ Error response:', error.response)
+      console.error('❌ Error response data:', error.response?.data)
+      console.error('❌ Error message:', error.message)
+      console.error('❌ Error stack:', error.stack)
+      
+      const message = error.response?.data?.message || error.message || 'Login failed'
+      toast.error(message)
+      
+      // Keep the form data so user can try again
+      // Don't clear the form
     }
   })
 
@@ -30,14 +62,35 @@ const Login = () => {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    loginMutation.mutate(formData)
+    e.stopPropagation()
+    
+    console.log('📝 Form submitted')
+    console.log('📝 Form data:', { email: formData.email, password: '***' })
+    console.log('📝 Mutation status before:', loginMutation.status)
+    
+    // Basic validation
+    if (!formData.email || !formData.password) {
+      console.log('⚠️ Validation failed: Missing fields')
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    console.log('🚀 Calling login mutation...')
+    
+    try {
+      await loginMutation.mutateAsync(formData)
+      console.log('📝 Mutation completed successfully')
+    } catch (error) {
+      console.log('📝 Mutation failed:', error.message)
+    }
   }
 
   const handleGoogleLogin = () => {
-    // Use the full backend URL without going through the proxy
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    // Get the full backend URL
+    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
+    console.log('🔗 Redirecting to Google OAuth:', `${backendUrl}/api/auth/google`)
     window.location.href = `${backendUrl}/api/auth/google`
   }
 
@@ -50,7 +103,8 @@ const Login = () => {
         <div className="mb-6">
           <button 
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center space-x-3 bg-white border-2 border-gray-300 rounded-lg py-3 hover:bg-gray-50"
+            type="button"
+            className="w-full flex items-center justify-center space-x-3 bg-white border-2 border-gray-300 rounded-lg py-3 hover:bg-gray-50 transition-colors"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -80,29 +134,55 @@ const Login = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
+              placeholder="your.email@example.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               required
+              autoComplete="email"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('password')}</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                tabIndex="-1"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loginMutation.isPending}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loginMutation.isPending ? 'Logging in...' : t('login')}
+            {loginMutation.isPending ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Logging in...
+              </span>
+            ) : t('login')}
           </button>
         </form>
 
