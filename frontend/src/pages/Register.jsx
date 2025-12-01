@@ -17,9 +17,7 @@ const Register = () => {
     phone: '',
     password: '',
     education: 'undergraduate',
-    skills: '',
-    teamwork: false,
-    motivation: ''
+    skills: ''
   })
   const [errors, setErrors] = useState({})
 
@@ -60,11 +58,6 @@ const Register = () => {
     // Skills validation (optional but should be reasonable if provided)
     if (formData.skills && formData.skills.length > 500) {
       newErrors.skills = 'Skills description should be under 500 characters'
-    }
-
-    // Motivation validation (optional but should be reasonable if provided)
-    if (formData.motivation && formData.motivation.length > 1000) {
-      newErrors.motivation = 'Motivation should be under 1000 characters'
     }
 
     setErrors(newErrors)
@@ -272,39 +265,6 @@ const Register = () => {
             ></textarea>
             {errors.skills && <p className="text-red-500 text-xs mt-1">{errors.skills}</p>}
             <p className="text-xs text-gray-500 mt-1">{formData.skills.length}/500 characters</p>
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              name="teamwork"
-              id="teamwork"
-              checked={formData.teamwork}
-              onChange={handleChange}
-              className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-            />
-            <label htmlFor="teamwork" className="ml-2 text-sm text-gray-700">
-              {t('teamwork')}
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('motivation')} (Optional)
-            </label>
-            <textarea
-              name="motivation"
-              value={formData.motivation}
-              onChange={handleChange}
-              placeholder="Tell us why you want to volunteer and what motivates you..."
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.motivation ? 'border-red-500' : 'border-gray-300'
-              }`}
-              rows="3"
-              maxLength={1000}
-            ></textarea>
-            {errors.motivation && <p className="text-red-500 text-xs mt-1">{errors.motivation}</p>}
-            <p className="text-xs text-gray-500 mt-1">{formData.motivation.length}/1000 characters</p>
           </div>
 
           <button
