@@ -89,8 +89,6 @@ passport.use(
           userId: user.id,
           education: 'undergraduate',
           skills: '',
-          teamwork: true,
-          motivation: '',
           notificationsEnabled: true
         })
 
