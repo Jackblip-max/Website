@@ -51,6 +51,12 @@ passport.use(
           // Link Google account to existing user
           console.log('Linking Google account to existing user:', user.email)
           user.googleId = profile.id
+          
+          // Set name from Google if not already set
+          if (!user.name || user.name === email.split('@')[0]) {
+            user.name = profile.displayName || profile.emails?.[0]?.value.split('@')[0]
+          }
+          
           await user.save()
           
           // Reload user with associations
@@ -61,14 +67,19 @@ passport.use(
           return done(null, user)
         }
 
-        // Create new user
+        // Create new user with Google profile info
         console.log('Creating new user:', email)
+        
+        // Extract name from Google profile - use displayName which is more complete
+        const displayName = profile.displayName || email.split('@')[0]
+        
         user = await User.create({
-          name: profile.displayName || email.split('@')[0],
+          name: displayName,
           email,
           googleId: profile.id,
           role: 'volunteer',
-          isVerified: true
+          isVerified: true,
+          phone: null  // Will need to be filled later
         })
 
         console.log('New user created with ID:', user.id)
