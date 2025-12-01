@@ -23,14 +23,6 @@ const Volunteer = sequelize.define('Volunteer', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  teamwork: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-  motivation: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
   notificationsEnabled: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
