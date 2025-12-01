@@ -16,7 +16,7 @@ export const register = async (req, res) => {
   try {
     console.log('Registration request received:', { ...req.body, password: '***' })
     
-    const { name, email, phone, password, education, skills, teamwork, motivation } = req.body
+    const { name, email, phone, password, education, skills } = req.body
 
     // Validate required fields
     if (!name || !email || !phone || !password) {
@@ -112,8 +112,6 @@ export const register = async (req, res) => {
       userId: user.id,
       education: education || 'undergraduate',
       skills: skills || '',
-      teamwork: teamwork || false,
-      motivation: motivation || '',
       notificationsEnabled: true
     })
 
@@ -132,8 +130,6 @@ export const register = async (req, res) => {
       volunteer: {
         education: education || 'undergraduate',
         skills: skills || '',
-        teamwork: teamwork || false,
-        motivation: motivation || '',
         notificationsEnabled: true
       }
     }
@@ -300,7 +296,7 @@ export const getProfile = async (req, res) => {
 // @access  Private
 export const updateProfile = async (req, res) => {
   try {
-    const { name, phone, education, skills, teamwork, motivation, notificationsEnabled } = req.body
+    const { name, phone, education, skills, notificationsEnabled } = req.body
 
     const user = await User.findByPk(req.user.id)
     if (!user) {
@@ -342,8 +338,6 @@ export const updateProfile = async (req, res) => {
         await volunteer.update({
           education: education || volunteer.education,
           skills: skills !== undefined ? skills : volunteer.skills,
-          teamwork: teamwork !== undefined ? teamwork : volunteer.teamwork,
-          motivation: motivation !== undefined ? motivation : volunteer.motivation,
           notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : volunteer.notificationsEnabled
         })
       }
@@ -389,7 +383,7 @@ export const completeProfile = async (req, res) => {
     console.log('Complete profile request:', req.body)
     console.log('User from token:', req.user)
 
-    const { phone, education, skills, teamwork, motivation } = req.body
+    const { phone, education, skills } = req.body
 
     // Validate required fields - only phone is required now
     if (!phone) {
@@ -432,17 +426,13 @@ export const completeProfile = async (req, res) => {
         userId: user.id,
         education: education || 'undergraduate',
         skills: skills || '',
-        teamwork: teamwork !== undefined ? teamwork : false,
-        motivation: motivation || '',
         notificationsEnabled: true
       })
     } else {
       console.log('Updating existing volunteer profile')
       await volunteer.update({
         education: education || volunteer.education,
-        skills: skills !== undefined ? skills : volunteer.skills,
-        teamwork: teamwork !== undefined ? teamwork : volunteer.teamwork,
-        motivation: motivation !== undefined ? motivation : volunteer.motivation
+        skills: skills !== undefined ? skills : volunteer.skills
       })
     }
 
