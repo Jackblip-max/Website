@@ -11,6 +11,7 @@ const Register = () => {
   const { t } = useLanguage()
   const { register: registerUser } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -288,6 +289,11 @@ const Register = () => {
       setErrors(prev => ({ ...prev, [name]: '' }))
     }
     
+    // Check password strength in real-time
+    if (name === 'password') {
+      checkPasswordStrength(value)
+    }
+    
     // Real-time name validation
     if (name === 'name') {
       const nameError = validateName(value)
@@ -324,6 +330,32 @@ const Register = () => {
       window.phoneCheckTimeout = setTimeout(() => {
         checkPhoneAvailability(value)
       }, 800)
+    }
+  }
+
+  const checkPasswordStrength = (password) => {
+    if (!password) {
+      setPasswordStrength('')
+      return
+    }
+
+    let strength = 0
+    const checks = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      numbers: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    }
+
+    strength = Object.values(checks).filter(Boolean).length
+
+    if (strength <= 2) {
+      setPasswordStrength('weak')
+    } else if (strength === 3 || strength === 4) {
+      setPasswordStrength('medium')
+    } else {
+      setPasswordStrength('strong')
     }
   }
 
@@ -586,12 +618,12 @@ const Register = () => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters with uppercase, lowercase, number & special character"
                 className={`w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
                   errors.password ? 'border-red-500' : 'border-gray-300'
                 }`}
                 required
-                minLength={6}
+                minLength={8}
               />
               <button
                 type="button"
@@ -607,7 +639,35 @@ const Register = () => {
               </button>
             </div>
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-            {!errors.password && <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>}
+            
+            {/* Password Strength Indicator */}
+            {formData.password && !errors.password && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        passwordStrength === 'weak' ? 'w-1/3 bg-red-500' :
+                        passwordStrength === 'medium' ? 'w-2/3 bg-yellow-500' :
+                        passwordStrength === 'strong' ? 'w-full bg-green-500' : 'w-0'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs font-medium ${
+                    passwordStrength === 'weak' ? 'text-red-500' :
+                    passwordStrength === 'medium' ? 'text-yellow-600' :
+                    passwordStrength === 'strong' ? 'text-green-600' : ''
+                  }`}>
+                    {passwordStrength === 'weak' ? 'Weak' :
+                     passwordStrength === 'medium' ? 'Medium' :
+                     passwordStrength === 'strong' ? 'Strong' : ''}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Password must contain: uppercase, lowercase, number & special character
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
