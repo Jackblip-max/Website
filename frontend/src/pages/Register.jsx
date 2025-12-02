@@ -220,13 +220,45 @@ const Register = () => {
       toast.success(response.message || 'Registration successful! Please check your email to verify your account.', {
         duration: 6000
       })
-      alert('Registration successful!\n\nPlease check your email inbox and click the verification link to activate your account.\n\nNote: Check your spam folder if you don\'t see the email.')
+      // Show detailed alert about email verification
+      alert(
+        '✅ Registration Successful!\n\n' +
+        '📧 Verification Email Sent\n\n' +
+        'We have sent a verification email to: ' + formData.email + '\n\n' +
+        'Please follow these steps:\n' +
+        '1. Check your email inbox\n' +
+        '2. Look for an email from MyanVolunteer\n' +
+        '3. Click the verification link in the email\n' +
+        '4. Return here to login\n\n' +
+        '⚠️ Important:\n' +
+        '- Check your spam/junk folder if you don\'t see the email\n' +
+        '- The verification link expires in 24 hours\n' +
+        '- You must verify your email before you can login'
+      )
       navigate('/login')
     },
     onError: (error) => {
       console.error('Registration error:', error)
       const message = error.response?.data?.message || 'Registration failed. Please try again.'
-      toast.error(message)
+      
+      // Show specific error if email sending failed
+      if (message.includes('verification email')) {
+        toast.error(
+          'Failed to send verification email. Please check your email address is correct and try again.',
+          { duration: 6000 }
+        )
+        alert(
+          '❌ Email Verification Failed\n\n' +
+          'We could not send a verification email to: ' + formData.email + '\n\n' +
+          'Possible reasons:\n' +
+          '- The email address may not exist\n' +
+          '- The email address may be incorrect\n' +
+          '- Email server is temporarily unavailable\n\n' +
+          'Please check your email address and try again.'
+        )
+      } else {
+        toast.error(message)
+      }
     }
   })
 
