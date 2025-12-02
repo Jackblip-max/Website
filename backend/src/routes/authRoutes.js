@@ -8,7 +8,8 @@ import {
   updateProfile, 
   completeProfile, 
   checkEmailAvailability,
-  checkNameAvailability, // Add this import
+  checkNameAvailability,
+  checkPhoneAvailability, // Add this import
   verifyEmail, 
   resendVerification 
 } from '../controllers/authController.js'
@@ -18,7 +19,8 @@ import { upload } from '../middleware/upload.js'
 const router = express.Router()
 
 router.post('/check-email', checkEmailAvailability)
-router.post('/check-name', checkNameAvailability) // Add this route
+router.post('/check-name', checkNameAvailability)
+router.post('/check-phone', checkPhoneAvailability) // Add this route
 router.post('/register', register)
 router.post('/login', login)
 router.get('/verify-email/:token', verifyEmail)
