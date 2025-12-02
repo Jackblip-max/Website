@@ -1,12 +1,19 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import { User, Volunteer, Organization } from '../models/index.js'
+import { sendVerificationEmail, sendWelcomeEmail } from '../services/emailService.js'
 
 // Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d'
   })
+}
+
+// Generate verification token
+const generateVerificationToken = () => {
+  return crypto.randomBytes(32).toString('hex')
 }
 
 // @desc    Check if email is available
@@ -137,6 +144,10 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt)
     console.log('Password hashed successfully')
 
+    // Generate verification token
+    const verificationToken = generateVerificationToken()
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
     // Create user with hashed password
     const user = await User.create({
       name: name.trim(),
@@ -144,10 +155,21 @@ export const register = async (req, res) => {
       phone: cleanPhone,
       password: hashedPassword,
       role: 'volunteer',
-      isVerified: false
+      isVerified: false,
+      verificationToken,
+      verificationExpires
     })
 
     console.log('User created successfully:', user.id)
+
+    // Send verification email
+    try {
+      await sendVerificationEmail(user.email, user.name, verificationToken)
+      console.log('Verification email sent to:', user.email)
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError)
+      // Continue with registration even if email fails
+    }
 
     // Create volunteer profile
     await Volunteer.create({
@@ -169,6 +191,7 @@ export const register = async (req, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      isVerified: user.isVerified,
       volunteer: {
         education: education || 'undergraduate',
         skills: '',
@@ -179,7 +202,8 @@ export const register = async (req, res) => {
     res.status(201).json({
       success: true,
       token,
-      user: userResponse
+      user: userResponse,
+      message: 'Registration successful! Please check your email to verify your account.'
     })
   } catch (error) {
     console.error('Register error details:', error)
@@ -411,6 +435,128 @@ export const updateProfile = async (req, res) => {
       success: false,
       message: 'Failed to update profile',
       error: error.message 
+    })
+  }
+}
+
+// @desc    Verify email
+// @route   GET /api/auth/verify-email/:token
+// @access  Public
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required'
+      })
+    }
+
+    // Find user with this token
+    const user = await User.findOne({
+      where: {
+        verificationToken: token
+      }
+    })
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification token'
+      })
+    }
+
+    // Check if token has expired
+    if (new Date() > user.verificationExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token has expired. Please request a new one.'
+      })
+    }
+
+    // Verify the user
+    user.isVerified = true
+    user.verificationToken = null
+    user.verificationExpires = null
+    await user.save()
+
+    console.log('User verified successfully:', user.email)
+
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(user.email, user.name)
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
+    }
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully! You can now login.'
+    })
+  } catch (error) {
+    console.error('Verify email error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify email',
+      error: error.message
+    })
+  }
+}
+
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+export const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      })
+    }
+
+    const user = await User.findOne({
+      where: { email: email.trim().toLowerCase() }
+    })
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      })
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already verified'
+      })
+    }
+
+    // Generate new verification token
+    const verificationToken = generateVerificationToken()
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    user.verificationToken = verificationToken
+    user.verificationExpires = verificationExpires
+    await user.save()
+
+    // Send verification email
+    await sendVerificationEmail(user.email, user.name, verificationToken)
+
+    res.json({
+      success: true,
+      message: 'Verification email sent! Please check your inbox.'
+    })
+  } catch (error) {
+    console.error('Resend verification error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend verification email',
+      error: error.message
     })
   }
 }
