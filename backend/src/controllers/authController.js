@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { Op } from 'sequelize'
 import { User, Volunteer, Organization } from '../models/index.js'
 import { sendVerificationEmail, sendWelcomeEmail } from '../services/emailService.js'
+import sequelize from '../config/database.js'
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -90,13 +91,12 @@ export const checkNameAvailability = async (req, res) => {
       })
     }
 
-    // Check if name exists (case-insensitive)
+    // Check if name exists (case-insensitive for MySQL)
     const existingUser = await User.findOne({ 
-      where: { 
-        name: {
-          [Op.iLike]: trimmedName
-        }
-      } 
+      where: sequelize.where(
+        sequelize.fn('LOWER', sequelize.col('name')),
+        sequelize.fn('LOWER', trimmedName)
+      )
     })
 
     res.json({
@@ -148,13 +148,12 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if name already exists (case-insensitive)
+    // Check if name already exists (case-insensitive for MySQL)
     const nameExists = await User.findOne({ 
-      where: { 
-        name: {
-          [Op.iLike]: trimmedName
-        }
-      } 
+      where: sequelize.where(
+        sequelize.fn('LOWER', sequelize.col('name')),
+        sequelize.fn('LOWER', trimmedName)
+      )
     })
     
     if (nameExists) {
