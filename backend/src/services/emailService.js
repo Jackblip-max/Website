@@ -10,13 +10,17 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false // Allow self-signed certificates
   }
 })
 
 // Verify email configuration on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('Email service error:', error)
+    console.error('❌ Email service error:', error)
+    console.error('Please check your SMTP settings in .env file')
   } else {
     console.log('✅ Email service is ready')
   }
@@ -24,6 +28,12 @@ transporter.verify((error, success) => {
 
 export const sendEmail = async ({ to, subject, text, html }) => {
   try {
+    // Validate email address format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(to)) {
+      throw new Error('Invalid email address format')
+    }
+
     const mailOptions = {
       from: `"MyanVolunteer" <${process.env.SMTP_USER}>`,
       to,
@@ -32,12 +42,29 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       html: html || text
     }
 
+    console.log('📧 Attempting to send email to:', to)
     const info = await transporter.sendMail(mailOptions)
-    console.log('Email sent:', info.messageId)
+    console.log('✅ Email sent successfully:', info.messageId)
+    console.log('📬 Preview URL:', nodemailer.getTestMessageUrl(info))
     return info
   } catch (error) {
-    console.error('Email sending error:', error)
-    throw error
+    console.error('❌ Email sending error:', error)
+    console.error('Error details:', {
+      code: error.code,
+      command: error.command,
+      response: error.response
+    })
+    
+    // Provide more specific error messages
+    if (error.code === 'EAUTH') {
+      throw new Error('Email authentication failed. Please check SMTP credentials.')
+    } else if (error.code === 'ESOCKET') {
+      throw new Error('Cannot connect to email server. Please check SMTP host and port.')
+    } else if (error.responseCode === 550) {
+      throw new Error('Email address does not exist or cannot receive messages.')
+    } else {
+      throw new Error(`Failed to send email: ${error.message}`)
+    }
   }
 }
 
@@ -109,7 +136,15 @@ export const sendVerificationEmail = async (userEmail, userName, verificationTok
     The MyanVolunteer Team
   `
   
-  return await sendEmail({ to: userEmail, subject, text, html })
+  try {
+    const result = await sendEmail({ to: userEmail, subject, text, html })
+    console.log('✅ Verification email sent successfully to:', userEmail)
+    return result
+  } catch (error) {
+    console.error('❌ Failed to send verification email:', error.message)
+    // Re-throw with more context
+    throw new Error(`Failed to send verification email: ${error.message}`)
+  }
 }
 
 export const sendDeadlineReminderEmail = async (userEmail, userName, opportunity) => {
