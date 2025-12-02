@@ -1,7 +1,10 @@
 import passport from 'passport'
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import { User, Volunteer } from '../models/index.js'
+import { sendVerificationEmail } from '../services/emailService.js'
 import dotenv from 'dotenv'
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 dotenv.config()
 
@@ -57,6 +60,15 @@ passport.use(
             user.name = profile.displayName || profile.emails?.[0]?.value.split('@')[0]
           }
           
+          // If user doesn't have a password (was created via Google), set a random one
+          // so they can login with email/password later if they want
+          if (!user.password) {
+            const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+            const salt = await bcrypt.genSalt(10)
+            user.password = await bcrypt.hash(randomPassword, salt)
+            console.log('Set random password for Google user to enable email/password login')
+          }
+          
           await user.save()
           
           // Reload user with associations
@@ -73,16 +85,23 @@ passport.use(
         // Extract name from Google profile - use displayName which is more complete
         const displayName = profile.displayName || email.split('@')[0]
         
+        // Generate a random password so user can login with email/password later
+        const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+        const salt = await bcrypt.genSalt(10)
+        const hashedPassword = await bcrypt.hash(randomPassword, salt)
+        
         user = await User.create({
           name: displayName,
           email,
           googleId: profile.id,
+          password: hashedPassword,  // Set password for future email/password login
           role: 'volunteer',
           isVerified: true,
           phone: null  // Will need to be filled later
         })
 
         console.log('New user created with ID:', user.id)
+        console.log('User can now login with email/password')
 
         // Create volunteer profile with default values
         await Volunteer.create({
