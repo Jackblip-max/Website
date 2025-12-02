@@ -1,13 +1,24 @@
 import express from 'express'
 import passport from 'passport'
 import jwt from 'jsonwebtoken'
-import { register, login, getProfile, updateProfile, completeProfile, checkEmailAvailability, verifyEmail, resendVerification } from '../controllers/authController.js'
+import { 
+  register, 
+  login, 
+  getProfile, 
+  updateProfile, 
+  completeProfile, 
+  checkEmailAvailability,
+  checkNameAvailability, // Add this import
+  verifyEmail, 
+  resendVerification 
+} from '../controllers/authController.js'
 import { authenticate } from '../middleware/auth.js'
 import { upload } from '../middleware/upload.js'
 
 const router = express.Router()
 
 router.post('/check-email', checkEmailAvailability)
+router.post('/check-name', checkNameAvailability) // Add this route
 router.post('/register', register)
 router.post('/login', login)
 router.get('/verify-email/:token', verifyEmail)
