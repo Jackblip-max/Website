@@ -321,8 +321,66 @@ const Register = () => {
       return
     }
 
-    console.log('Submitting registration:', { ...formData, password: '***' })
-    registerMutation.mutate(formData)
+    // Show loading toast
+    const loadingToast = toast.loading('Validating your email address...')
+
+    // Validate email existence first
+    fetch(`${import.meta.env.VITE_API_URL}/auth/validate-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: formData.email.trim().toLowerCase() })
+    })
+      .then(response => response.json())
+      .then(data => {
+        toast.dismiss(loadingToast)
+        
+        if (!data.valid) {
+          // Email doesn't exist or is invalid
+          const message = data.message || "Couldn't find your Google Account"
+          
+          toast.error(message, { duration: 5000 })
+          
+          // Show detailed alert
+          alert(
+            '❌ Email Validation Failed\n\n' +
+            message + '\n\n' +
+            'Please check:\n' +
+            '• Your email address is spelled correctly\n' +
+            '• Your Google account exists\n' +
+            '• You have access to this email address\n\n' +
+            'For Gmail accounts:\n' +
+            '• Username must be 6-30 characters\n' +
+            '• Cannot start or end with a period (.)\n' +
+            '• Cannot have consecutive periods (..)'
+          )
+          
+          // Focus on email input
+          document.querySelector('input[name="email"]')?.focus()
+          return
+        }
+        
+        // Email is valid, proceed with registration
+        console.log('✅ Email validated, proceeding with registration:', formData.email)
+        registerMutation.mutate(formData)
+      })
+      .catch(error => {
+        toast.dismiss(loadingToast)
+        console.error('Email validation error:', error)
+        
+        // If validation service fails, show warning but allow registration
+        const proceed = window.confirm(
+          '⚠️ Unable to validate email address\n\n' +
+          'We couldn\'t verify your email address at this time.\n\n' +
+          'Do you want to proceed with registration anyway?\n\n' +
+          'Note: You will need access to this email to verify your account.'
+        )
+        
+        if (proceed) {
+          registerMutation.mutate(formData)
+        }
+      })
   }
 
   const handleGoogleLogin = () => {
