@@ -10,11 +10,12 @@ const Login = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
   const { login } = useAuth()
+  const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
-  const [showPassword, setShowPassword] = useState(false)
+  const [validatingEmail, setValidatingEmail] = useState(false)
 
   const loginMutation = useMutation({
     mutationFn: async (data) => {
@@ -51,15 +52,34 @@ const Login = () => {
       
       const message = error.response?.data?.message || error.message || 'Login failed'
       toast.error(message)
-      
-      // Keep the form data so user can try again
-      // Don't clear the form
     }
   })
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const validateEmailExistence = async (email) => {
+    try {
+      setValidatingEmail(true)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/validate-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      })
+
+      const data = await response.json()
+      return data.valid
+    } catch (error) {
+      console.error('Email validation error:', error)
+      // If validation fails, allow login attempt anyway
+      return true
+    } finally {
+      setValidatingEmail(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -74,6 +94,39 @@ const Login = () => {
     if (!formData.email || !formData.password) {
       console.log('⚠️ Validation failed: Missing fields')
       toast.error('Please fill in all fields')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    // Check if email exists (for better UX)
+    const loadingToast = toast.loading('Checking your account...')
+    
+    const emailExists = await validateEmailExistence(formData.email)
+    
+    toast.dismiss(loadingToast)
+
+    if (!emailExists) {
+      toast.error("Couldn't find your Google Account. Please check your email address.", {
+        duration: 5000
+      })
+      
+      alert(
+        '❌ Account Not Found\n\n' +
+        "We couldn't find an account with this email address.\n\n" +
+        'Please check:\n' +
+        '• Your email address is spelled correctly\n' +
+        '• You have registered with this email\n' +
+        '• Your Google account exists\n\n' +
+        'If you haven\'t registered yet, please sign up first.'
+      )
+      
+      document.querySelector('input[name="email"]')?.focus()
       return
     }
 
@@ -171,10 +224,18 @@ const Login = () => {
 
           <button
             type="submit"
-            disabled={loginMutation.isPending}
+            disabled={loginMutation.isPending || validatingEmail}
             className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loginMutation.isPending ? (
+            {validatingEmail ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Validating...
+              </span>
+            ) : loginMutation.isPending ? (
               <span className="flex items-center justify-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
