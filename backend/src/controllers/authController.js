@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import { Op } from 'sequelize'
 import { User, Volunteer, Organization } from '../models/index.js'
 import { sendVerificationEmail, sendWelcomeEmail } from '../services/emailService.js'
 
@@ -58,6 +59,60 @@ export const checkEmailAvailability = async (req, res) => {
   }
 }
 
+// @desc    Check if name is available
+// @route   POST /api/auth/check-name
+// @access  Public
+export const checkNameAvailability = async (req, res) => {
+  try {
+    const { name } = req.body
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      })
+    }
+
+    // Validate name format
+    const trimmedName = name.trim()
+    
+    if (trimmedName.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be at least 2 characters'
+      })
+    }
+
+    if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name can only contain letters and spaces'
+      })
+    }
+
+    // Check if name exists (case-insensitive)
+    const existingUser = await User.findOne({ 
+      where: { 
+        name: {
+          [Op.iLike]: trimmedName
+        }
+      } 
+    })
+
+    res.json({
+      success: true,
+      available: !existingUser,
+      message: existingUser ? 'This name is already taken' : 'Name is available'
+    })
+  } catch (error) {
+    console.error('Check name error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check name availability'
+    })
+  }
+}
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -77,17 +132,36 @@ export const register = async (req, res) => {
     }
 
     // Validate name
-    if (name.trim().length < 2) {
+    const trimmedName = name.trim()
+    
+    if (trimmedName.length < 2) {
       return res.status(400).json({
         success: false,
         message: 'Name must be at least 2 characters'
       })
     }
 
-    if (!/^[a-zA-Z\s]+$/.test(name)) {
+    if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
       return res.status(400).json({
         success: false,
         message: 'Name can only contain letters and spaces'
+      })
+    }
+
+    // Check if name already exists (case-insensitive)
+    const nameExists = await User.findOne({ 
+      where: { 
+        name: {
+          [Op.iLike]: trimmedName
+        }
+      } 
+    })
+    
+    if (nameExists) {
+      console.log('Name already exists:', trimmedName)
+      return res.status(400).json({ 
+        success: false,
+        message: 'This name is already taken. Please choose a different name.' 
       })
     }
 
@@ -150,7 +224,7 @@ export const register = async (req, res) => {
 
     // Create user with hashed password
     const user = await User.create({
-      name: name.trim(),
+      name: trimmedName,
       email: email.trim().toLowerCase(),
       phone: cleanPhone,
       password: hashedPassword,
