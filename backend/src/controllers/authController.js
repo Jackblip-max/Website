@@ -293,6 +293,16 @@ export const register = async (req, res) => {
       })
     }
 
+    // CHECK IF USER EXISTS WITH THIS EMAIL FIRST (before email validation)
+    const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
+    if (userExists) {
+      console.log('User already exists:', email)
+      return res.status(400).json({ 
+        success: false,
+        message: 'User already exists with this email' 
+      })
+    }
+
     // Validate email existence before proceeding
     console.log('🔍 Validating email existence:', email)
     const emailValidation = await validateGmailAccount(email)
@@ -307,21 +317,38 @@ export const register = async (req, res) => {
     
     console.log('✅ Email validation passed:', email)
 
-    // Check if user exists with this email
-    const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
-    if (userExists) {
-      console.log('User already exists:', email)
-      return res.status(400).json({ 
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({
         success: false,
-        message: 'User already exists with this email' 
+        message: 'Password must be at least 8 characters'
       })
     }
 
-    // Validate password strength
-    if (password.length < 6) {
+    // Check password strength requirements
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumbers = /\d/.test(password)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+
+    if (!hasUpperCase || !hasLowerCase) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters'
+        message: 'Password must contain both uppercase and lowercase letters'
+      })
+    }
+
+    if (!hasNumbers) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one number'
+      })
+    }
+
+    if (!hasSpecialChar) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one special character (!@#$%^&*...)'
       })
     }
 
