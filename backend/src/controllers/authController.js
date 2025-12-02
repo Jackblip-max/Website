@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { Op } from 'sequelize'
 import { User, Volunteer, Organization } from '../models/index.js'
 import { sendVerificationEmail, sendWelcomeEmail } from '../services/emailService.js'
+import { validateGmailAccount, quickEmailCheck } from '../services/emailValidationService.js'
 import sequelize from '../config/database.js'
 
 // Generate JWT Token
@@ -16,6 +17,60 @@ const generateToken = (id) => {
 // Generate verification token
 const generateVerificationToken = () => {
   return crypto.randomBytes(32).toString('hex')
+}
+
+// @desc    Validate email existence
+// @route   POST /api/auth/validate-email
+// @access  Public
+export const validateEmailExistence = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      })
+    }
+
+    console.log('🔍 Validating email existence:', email)
+
+    // Validate email format first
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: 'Invalid email format'
+      })
+    }
+
+    // Check if it's a Gmail account and validate
+    const validation = await validateGmailAccount(email)
+    
+    console.log('📧 Email validation result:', validation)
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        valid: false,
+        message: validation.message || 'Email validation failed'
+      })
+    }
+
+    res.json({
+      success: true,
+      valid: true,
+      message: validation.message
+    })
+  } catch (error) {
+    console.error('❌ Email validation error:', error)
+    res.status(500).json({
+      success: false,
+      valid: false,
+      message: 'Failed to validate email'
+    })
+  }
 }
 
 // @desc    Check if email is available
@@ -237,6 +292,20 @@ export const register = async (req, res) => {
         message: 'Please provide a valid email address'
       })
     }
+
+    // Validate email existence before proceeding
+    console.log('🔍 Validating email existence:', email)
+    const emailValidation = await validateGmailAccount(email)
+    
+    if (!emailValidation.valid) {
+      console.log('❌ Email validation failed:', emailValidation.message)
+      return res.status(400).json({
+        success: false,
+        message: emailValidation.message || "Couldn't find your Google Account. Please check your email address."
+      })
+    }
+    
+    console.log('✅ Email validation passed:', email)
 
     // Check if user exists with this email
     const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
