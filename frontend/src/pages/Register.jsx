@@ -16,21 +16,89 @@ const Register = () => {
     email: '',
     phone: '',
     password: '',
-    education: 'undergraduate',
-    skills: ''
+    education: 'undergraduate'
   })
   const [errors, setErrors] = useState({})
+  const [checkingEmail, setCheckingEmail] = useState(false)
+  const [emailAvailable, setEmailAvailable] = useState(null)
+
+  const validateName = (name) => {
+    const trimmedName = name.trim()
+    
+    if (!trimmedName) {
+      return 'Name is required'
+    }
+    
+    if (trimmedName.length < 2) {
+      return 'Name must be at least 2 characters'
+    }
+    
+    if (trimmedName.length > 50) {
+      return 'Name must be less than 50 characters'
+    }
+    
+    if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+      return 'Name can only contain letters and spaces'
+    }
+    
+    // Check for multiple consecutive spaces
+    if (/\s{2,}/.test(trimmedName)) {
+      return 'Name cannot have multiple consecutive spaces'
+    }
+    
+    // Check if name starts or ends with space
+    if (name !== trimmedName) {
+      return 'Name cannot start or end with spaces'
+    }
+    
+    return null
+  }
+
+  const checkEmailAvailability = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return
+    }
+
+    setCheckingEmail(true)
+    setEmailAvailable(null)
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setEmailAvailable(data.available)
+        if (!data.available) {
+          setErrors(prev => ({ ...prev, email: 'This email is already registered' }))
+        } else {
+          setErrors(prev => {
+            const newErrors = { ...prev }
+            delete newErrors.email
+            return newErrors
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Email check error:', error)
+    } finally {
+      setCheckingEmail(false)
+    }
+  }
 
   const validateForm = () => {
     const newErrors = {}
 
     // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required'
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters'
-    } else if (!/^[a-zA-Z\s]+$/.test(formData.name)) {
-      newErrors.name = 'Name can only contain letters and spaces'
+    const nameError = validateName(formData.name)
+    if (nameError) {
+      newErrors.name = nameError
     }
 
     // Email validation
@@ -38,6 +106,8 @@ const Register = () => {
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address'
+    } else if (emailAvailable === false) {
+      newErrors.email = 'This email is already registered'
     }
 
     // Phone validation
@@ -53,11 +123,6 @@ const Register = () => {
       newErrors.password = 'Password is required'
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters'
-    }
-
-    // Skills validation (optional but should be reasonable if provided)
-    if (formData.skills && formData.skills.length > 500) {
-      newErrors.skills = 'Skills description should be under 500 characters'
     }
 
     setErrors(newErrors)
@@ -78,14 +143,39 @@ const Register = () => {
   })
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }))
+    
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+    
+    // Real-time name validation
+    if (name === 'name') {
+      const nameError = validateName(value)
+      if (nameError) {
+        setErrors(prev => ({ ...prev, name: nameError }))
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          delete newErrors.name
+          return newErrors
+        })
+      }
+    }
+    
+    // Check email availability when user finishes typing
+    if (name === 'email') {
+      setEmailAvailable(null)
+      // Debounce email check
+      clearTimeout(window.emailCheckTimeout)
+      window.emailCheckTimeout = setTimeout(() => {
+        checkEmailAvailability(value)
+      }, 800)
     }
   }
 
@@ -154,29 +244,67 @@ const Register = () => {
               onChange={handleChange}
               placeholder="Your full name"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
+                errors.name ? 'border-red-500' : formData.name && !errors.name ? 'border-green-500' : 'border-gray-300'
               }`}
               required
             />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+            {formData.name && !errors.name && formData.name.trim().length >= 2 && (
+              <p className="text-green-600 text-xs mt-1 flex items-center">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Valid name
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('email')} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="your.email@example.com"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
-              required
-            />
+            <div className="relative">
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="your.email@example.com"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                  errors.email ? 'border-red-500' : emailAvailable === true ? 'border-green-500' : 'border-gray-300'
+                }`}
+                required
+              />
+              {checkingEmail && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              )}
+              {emailAvailable === true && !checkingEmail && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+            </div>
             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            {emailAvailable === true && !errors.email && (
+              <p className="text-green-600 text-xs mt-1 flex items-center">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Email is available
+              </p>
+            )}
+            {emailAvailable === false && (
+              <p className="text-red-500 text-xs mt-1">
+                This email is already registered. <Link to="/login" className="underline">Login instead?</Link>
+              </p>
+            )}
           </div>
 
           <div>
@@ -246,25 +374,6 @@ const Register = () => {
               <option value="undergraduate">{t('undergraduate')}</option>
               <option value="graduate">{t('graduate')}</option>
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('skills')} (Optional)
-            </label>
-            <textarea
-              name="skills"
-              value={formData.skills}
-              onChange={handleChange}
-              placeholder="e.g., Communication, Leadership, Teaching, Organization..."
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.skills ? 'border-red-500' : 'border-gray-300'
-              }`}
-              rows="3"
-              maxLength={500}
-            ></textarea>
-            {errors.skills && <p className="text-red-500 text-xs mt-1">{errors.skills}</p>}
-            <p className="text-xs text-gray-500 mt-1">{formData.skills.length}/500 characters</p>
           </div>
 
           <button
