@@ -63,10 +63,14 @@ const connectDB = async () => {
     await sequelize.authenticate()
     console.log('✅ Database connected successfully')
     
-    // Sync models in development
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true })
+    // Don't use sync in production - use migrations instead
+    // For development, only sync if explicitly needed
+    if (process.env.NODE_ENV === 'development' && process.env.SYNC_DB === 'true') {
+      await sequelize.sync({ alter: false, force: false })
       console.log('✅ Database models synchronized')
+    } else {
+      console.log('⚠️  Database sync disabled. Use migrations for schema changes.')
+      console.log('   Set SYNC_DB=true in .env if you need to sync models')
     }
   } catch (error) {
     console.error('❌ Database connection failed:', error)
