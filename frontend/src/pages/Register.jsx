@@ -20,7 +20,11 @@ const Register = () => {
   })
   const [errors, setErrors] = useState({})
   const [checkingEmail, setCheckingEmail] = useState(false)
+  const [checkingName, setCheckingName] = useState(false)
+  const [checkingPhone, setCheckingPhone] = useState(false)
   const [emailAvailable, setEmailAvailable] = useState(null)
+  const [nameAvailable, setNameAvailable] = useState(null)
+  const [phoneAvailable, setPhoneAvailable] = useState(null)
 
   const validateName = (name) => {
     const trimmedName = name.trim()
@@ -52,6 +56,44 @@ const Register = () => {
     }
     
     return null
+  }
+
+  const checkNameAvailability = async (name) => {
+    if (!name || name.trim().length < 2) {
+      return
+    }
+
+    setCheckingName(true)
+    setNameAvailable(null)
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-name`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: name.trim() })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setNameAvailable(data.available)
+        if (!data.available) {
+          setErrors(prev => ({ ...prev, name: 'This name is already taken' }))
+        } else {
+          setErrors(prev => {
+            const newErrors = { ...prev }
+            delete newErrors.name
+            return newErrors
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Name check error:', error)
+    } finally {
+      setCheckingName(false)
+    }
   }
 
   const checkEmailAvailability = async (email) => {
@@ -92,6 +134,45 @@ const Register = () => {
     }
   }
 
+  const checkPhoneAvailability = async (phone) => {
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    if (!cleanPhone || !/^(\+?95|09)\d{7,10}$/.test(cleanPhone)) {
+      return
+    }
+
+    setCheckingPhone(true)
+    setPhoneAvailable(null)
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: cleanPhone })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setPhoneAvailable(data.available)
+        if (!data.available) {
+          setErrors(prev => ({ ...prev, phone: 'This phone number is already registered' }))
+        } else {
+          setErrors(prev => {
+            const newErrors = { ...prev }
+            delete newErrors.phone
+            return newErrors
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Phone check error:', error)
+    } finally {
+      setCheckingPhone(false)
+    }
+  }
+
   const validateForm = () => {
     const newErrors = {}
 
@@ -99,6 +180,8 @@ const Register = () => {
     const nameError = validateName(formData.name)
     if (nameError) {
       newErrors.name = nameError
+    } else if (nameAvailable === false) {
+      newErrors.name = 'This name is already taken'
     }
 
     // Email validation
@@ -116,6 +199,8 @@ const Register = () => {
       newErrors.phone = 'Phone number is required'
     } else if (!/^(\+?95|09)\d{7,10}$/.test(cleanPhone)) {
       newErrors.phone = 'Please enter a valid Myanmar phone number (e.g., 09xxxxxxxxx)'
+    } else if (phoneAvailable === false) {
+      newErrors.phone = 'This phone number is already registered'
     }
 
     // Password validation
@@ -135,7 +220,6 @@ const Register = () => {
       toast.success(response.message || 'Registration successful! Please check your email to verify your account.', {
         duration: 6000
       })
-      // Show alert about email verification
       alert('Registration successful!\n\nPlease check your email inbox and click the verification link to activate your account.\n\nNote: Check your spam folder if you don\'t see the email.')
       navigate('/login')
     },
@@ -163,22 +247,36 @@ const Register = () => {
       const nameError = validateName(value)
       if (nameError) {
         setErrors(prev => ({ ...prev, name: nameError }))
+        setNameAvailable(null)
       } else {
         setErrors(prev => {
           const newErrors = { ...prev }
           delete newErrors.name
           return newErrors
         })
+        // Check name availability when user finishes typing
+        clearTimeout(window.nameCheckTimeout)
+        window.nameCheckTimeout = setTimeout(() => {
+          checkNameAvailability(value)
+        }, 800)
       }
     }
     
     // Check email availability when user finishes typing
     if (name === 'email') {
       setEmailAvailable(null)
-      // Debounce email check
       clearTimeout(window.emailCheckTimeout)
       window.emailCheckTimeout = setTimeout(() => {
         checkEmailAvailability(value)
+      }, 800)
+    }
+
+    // Check phone availability when user finishes typing
+    if (name === 'phone') {
+      setPhoneAvailable(null)
+      clearTimeout(window.phoneCheckTimeout)
+      window.phoneCheckTimeout = setTimeout(() => {
+        checkPhoneAvailability(value)
       }, 800)
     }
   }
@@ -241,24 +339,41 @@ const Register = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('name')} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Your full name"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.name ? 'border-red-500' : formData.name && !errors.name ? 'border-green-500' : 'border-gray-300'
-              }`}
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Your full name"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                  errors.name ? 'border-red-500' : nameAvailable === true ? 'border-green-500' : 'border-gray-300'
+                }`}
+                required
+              />
+              {checkingName && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              )}
+              {nameAvailable === true && !checkingName && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+            </div>
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-            {formData.name && !errors.name && formData.name.trim().length >= 2 && (
+            {nameAvailable === true && !errors.name && (
               <p className="text-green-600 text-xs mt-1 flex items-center">
                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                Valid name
+                Name is available
               </p>
             )}
           </div>
@@ -317,19 +432,44 @@ const Register = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('phone')} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="09xxxxxxxxx or +959xxxxxxxxx"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                errors.phone ? 'border-red-500' : 'border-gray-300'
-              }`}
-              required
-            />
+            <div className="relative">
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="09xxxxxxxxx or +959xxxxxxxxx"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                  errors.phone ? 'border-red-500' : phoneAvailable === true ? 'border-green-500' : 'border-gray-300'
+                }`}
+                required
+              />
+              {checkingPhone && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              )}
+              {phoneAvailable === true && !checkingPhone && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+            </div>
             {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-            {!errors.phone && <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>}
+            {phoneAvailable === true && !errors.phone && (
+              <p className="text-green-600 text-xs mt-1 flex items-center">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Phone number is available
+              </p>
+            )}
+            {!errors.phone && !phoneAvailable && <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>}
           </div>
 
           <div>
