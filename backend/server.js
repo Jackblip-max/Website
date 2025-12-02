@@ -9,7 +9,7 @@ import cron from 'node-cron'
 import session from 'express-session'
 import passport from './src/config/passport.js'
 import { sequelize } from './src/config/database.js'
-import { checkExpiredDeadlines } from './src/jobs/deadlineChecker.js'
+import { checkExpiredDeadlines, sendDeadlineReminders } from './src/jobs/deadlineChecker.js'
 import routes from './src/routes/index.js'
 import { errorHandler } from './src/middleware/errorHandler.js'
 
@@ -78,11 +78,21 @@ const connectDB = async () => {
 const startServer = async () => {
   await connectDB()
   
+  // Schedule cron job to send deadline reminders every day at 9 AM
+  cron.schedule('0 9 * * *', () => {
+    console.log('🔔 Running deadline reminder checker...')
+    sendDeadlineReminders()
+  })
+  
   // Schedule cron job to check expired deadlines every day at midnight
   cron.schedule('0 0 * * *', () => {
-    console.log('Running deadline checker...')
+    console.log('🕐 Running expired deadline checker...')
     checkExpiredDeadlines()
   })
+  
+  console.log('✅ Cron jobs scheduled:')
+  console.log('   - Deadline reminders: Every day at 9:00 AM')
+  console.log('   - Expired deadlines: Every day at 12:00 AM')
   
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
