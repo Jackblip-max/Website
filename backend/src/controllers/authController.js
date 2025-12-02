@@ -113,6 +113,50 @@ export const checkNameAvailability = async (req, res) => {
   }
 }
 
+// @desc    Check if phone is available
+// @route   POST /api/auth/check-phone
+// @access  Public
+export const checkPhoneAvailability = async (req, res) => {
+  try {
+    const { phone } = req.body
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required'
+      })
+    }
+
+    // Clean and validate phone format
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
+    
+    if (!phoneRegex.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format'
+      })
+    }
+
+    // Check if phone exists
+    const existingUser = await User.findOne({ 
+      where: { phone: cleanPhone } 
+    })
+
+    res.json({
+      success: true,
+      available: !existingUser,
+      message: existingUser ? 'This phone number is already registered' : 'Phone number is available'
+    })
+  } catch (error) {
+    console.error('Check phone error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check phone availability'
+    })
+  }
+}
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -175,6 +219,15 @@ export const register = async (req, res) => {
       })
     }
 
+    // Check if phone number already exists
+    const phoneExists = await User.findOne({ where: { phone: cleanPhone } })
+    if (phoneExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'This phone number is already registered'
+      })
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
@@ -182,14 +235,6 @@ export const register = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid email address'
-      })
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters'
       })
     }
 
@@ -203,12 +248,11 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if phone number already exists
-    const phoneExists = await User.findOne({ where: { phone: cleanPhone } })
-    if (phoneExists) {
+    // Validate password strength
+    if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'This phone number is already registered'
+        message: 'Password must be at least 6 characters'
       })
     }
 
