@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
 
 import CompleteProfile from './pages/CompleteProfile'
+import VerifyEmail from './pages/VerifyEmail'
 import MainLayout from './layouts/MainLayout'
 import Home from './pages/Home'
 import About from './pages/About'
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/create-organization" element={<CreateOrganization />} />
                 <Route path="/org-dashboard" element={<OrgDashboard />} />
