@@ -70,7 +70,7 @@ export const validateGmailAccount = async (email) => {
     if (username.length < 6 || username.length > 30) {
       return {
         valid: false,
-        message: 'Gmail usernames must be between 6 and 30 characters'
+        message: "Couldn't find your Google Account. Gmail usernames must be between 6 and 30 characters."
       }
     }
 
@@ -78,14 +78,14 @@ export const validateGmailAccount = async (email) => {
     if (username.startsWith('.') || username.endsWith('.')) {
       return {
         valid: false,
-        message: 'Gmail addresses cannot start or end with a period'
+        message: "Couldn't find your Google Account. Gmail addresses cannot start or end with a period."
       }
     }
 
     if (username.includes('..')) {
       return {
         valid: false,
-        message: 'Gmail addresses cannot have consecutive periods'
+        message: "Couldn't find your Google Account. Gmail addresses cannot have consecutive periods."
       }
     }
 
@@ -96,13 +96,13 @@ export const validateGmailAccount = async (email) => {
       valid: domainValid,
       message: domainValid 
         ? 'Email appears to be valid' 
-        : 'Unable to verify email. Please ensure your Gmail account exists.'
+        : "Couldn't find your Google Account. Please check your email address."
     }
   } catch (error) {
     console.error('Gmail validation error:', error)
     return {
       valid: false,
-      message: 'Unable to validate email address'
+      message: "Couldn't find your Google Account. Please check your email address."
     }
   }
 }
