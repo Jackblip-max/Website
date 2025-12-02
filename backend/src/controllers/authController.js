@@ -282,10 +282,16 @@ export const register = async (req, res) => {
     // Send verification email
     try {
       await sendVerificationEmail(user.email, user.name, verificationToken)
-      console.log('Verification email sent to:', user.email)
+      console.log('✅ Verification email sent successfully to:', user.email)
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError)
-      // Continue with registration even if email fails
+      console.error('❌ Failed to send verification email:', emailError)
+      // If email fails, delete the user and return error
+      await user.destroy()
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email. Please check your email address and try again.',
+        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+      })
     }
 
     // Create volunteer profile
@@ -563,7 +569,10 @@ export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params
 
+    console.log('📧 Email verification attempt with token:', token)
+
     if (!token) {
+      console.log('❌ No token provided')
       return res.status(400).json({
         success: false,
         message: 'Verification token is required'
@@ -578,17 +587,31 @@ export const verifyEmail = async (req, res) => {
     })
 
     if (!user) {
+      console.log('❌ No user found with token:', token)
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification token'
+        message: 'Invalid or expired verification token. The token may have already been used or has expired.'
+      })
+    }
+
+    console.log('✅ User found:', user.email)
+
+    // Check if already verified
+    if (user.isVerified) {
+      console.log('✅ User already verified:', user.email)
+      return res.json({
+        success: true,
+        message: 'Email already verified! You can login now.'
       })
     }
 
     // Check if token has expired
-    if (new Date() > user.verificationExpires) {
+    if (user.verificationExpires && new Date() > user.verificationExpires) {
+      console.log('❌ Token expired for user:', user.email)
       return res.status(400).json({
         success: false,
-        message: 'Verification token has expired. Please request a new one.'
+        message: 'Verification token has expired. Please request a new verification email.',
+        expired: true
       })
     }
 
@@ -598,13 +621,15 @@ export const verifyEmail = async (req, res) => {
     user.verificationExpires = null
     await user.save()
 
-    console.log('User verified successfully:', user.email)
+    console.log('✅ User verified successfully:', user.email)
 
     // Send welcome email
     try {
       await sendWelcomeEmail(user.email, user.name)
+      console.log('✅ Welcome email sent to:', user.email)
     } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError)
+      console.error('❌ Failed to send welcome email:', emailError)
+      // Continue even if welcome email fails
     }
 
     res.json({
@@ -612,11 +637,11 @@ export const verifyEmail = async (req, res) => {
       message: 'Email verified successfully! You can now login.'
     })
   } catch (error) {
-    console.error('Verify email error:', error)
+    console.error('❌ Verify email error:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to verify email',
-      error: error.message
+      message: 'Failed to verify email. Please try again or contact support.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
   }
 }
