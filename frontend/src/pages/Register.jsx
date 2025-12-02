@@ -131,9 +131,13 @@ const Register = () => {
 
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
-    onSuccess: () => {
-      toast.success('Registration successful! Welcome to MyanVolunteer!')
-      navigate('/')
+    onSuccess: (response) => {
+      toast.success(response.message || 'Registration successful! Please check your email to verify your account.', {
+        duration: 6000
+      })
+      // Show alert about email verification
+      alert('Registration successful!\n\nPlease check your email inbox and click the verification link to activate your account.\n\nNote: Check your spam folder if you don\'t see the email.')
+      navigate('/login')
     },
     onError: (error) => {
       console.error('Registration error:', error)
