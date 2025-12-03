@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -23,7 +23,9 @@ const Register = () => {
   const [checkingEmail, setCheckingEmail] = useState(false)
   const [checkingName, setCheckingName] = useState(false)
   const [checkingPhone, setCheckingPhone] = useState(false)
+  const [validatingEmail, setValidatingEmail] = useState(false)
   const [emailAvailable, setEmailAvailable] = useState(null)
+  const [emailExists, setEmailExists] = useState(null)
   const [nameAvailable, setNameAvailable] = useState(null)
   const [phoneAvailable, setPhoneAvailable] = useState(null)
 
@@ -46,17 +48,59 @@ const Register = () => {
       return 'Name can only contain letters and spaces'
     }
     
-    // Check for multiple consecutive spaces
     if (/\s{2,}/.test(trimmedName)) {
       return 'Name cannot have multiple consecutive spaces'
     }
     
-    // Check if name starts or ends with space
     if (name !== trimmedName) {
       return 'Name cannot start or end with spaces'
     }
     
     return null
+  }
+
+  const validateEmailExistence = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return
+    }
+
+    setValidatingEmail(true)
+    setEmailExists(null)
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/validate-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      })
+
+      const data = await response.json()
+      
+      if (!data.valid) {
+        setEmailExists(false)
+        setErrors(prev => ({ 
+          ...prev, 
+          email: data.message || "This email address doesn't exist or cannot receive messages"
+        }))
+      } else {
+        setEmailExists(true)
+        // Clear email existence error, but keep checking availability
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          if (newErrors.email?.includes("doesn't exist") || newErrors.email?.includes("cannot receive")) {
+            delete newErrors.email
+          }
+          return newErrors
+        })
+      }
+    } catch (error) {
+      console.error('Email validation error:', error)
+      setEmailExists(null)
+    } finally {
+      setValidatingEmail(false)
+    }
   }
 
   const checkNameAvailability = async (name) => {
@@ -123,7 +167,9 @@ const Register = () => {
         } else {
           setErrors(prev => {
             const newErrors = { ...prev }
-            delete newErrors.email
+            if (newErrors.email === 'This email is already registered') {
+              delete newErrors.email
+            }
             return newErrors
           })
         }
@@ -190,6 +236,8 @@ const Register = () => {
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address'
+    } else if (emailExists === false) {
+      newErrors.email = "This email address doesn't exist or cannot receive messages"
     } else if (emailAvailable === false) {
       newErrors.email = 'This email is already registered'
     }
@@ -204,13 +252,12 @@ const Register = () => {
       newErrors.phone = 'This phone number is already registered'
     }
 
-    // Password validation - ENHANCED
+    // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required'
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters'
     } else {
-      // Check password strength
       const hasUpperCase = /[A-Z]/.test(formData.password)
       const hasLowerCase = /[a-z]/.test(formData.password)
       const hasNumbers = /\d/.test(formData.password)
@@ -232,24 +279,14 @@ const Register = () => {
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
     onSuccess: (response) => {
-      toast.success('Registration successful! Please check your email to verify your account.', {
-        duration: 5000
-      })
-      toast.success('📧 Verification email sent to ' + formData.email, {
-        duration: 5000
-      })
+      toast.success('✅ Registration successful!', { duration: 4000 })
+      toast.success('📧 Please check your email to verify your account', { duration: 5000 })
       navigate('/login')
     },
     onError: (error) => {
       console.error('Registration error:', error)
       const message = error.response?.data?.message || 'Registration failed. Please try again.'
-      
-      // Show specific error if email sending failed or email validation failed
-      if (message.includes('verification email') || message.includes("Couldn't find")) {
-        toast.error(message, { duration: 5000 })
-      } else {
-        toast.error(message, { duration: 4000 })
-      }
+      toast.error(message, { duration: 5000 })
     }
   })
 
@@ -260,17 +297,14 @@ const Register = () => {
       [name]: value
     }))
     
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }))
     }
     
-    // Check password strength in real-time
     if (name === 'password') {
       checkPasswordStrength(value)
     }
     
-    // Real-time name validation
     if (name === 'name') {
       const nameError = validateName(value)
       if (nameError) {
@@ -282,7 +316,6 @@ const Register = () => {
           delete newErrors.name
           return newErrors
         })
-        // Check name availability when user finishes typing
         clearTimeout(window.nameCheckTimeout)
         window.nameCheckTimeout = setTimeout(() => {
           checkNameAvailability(value)
@@ -290,16 +323,25 @@ const Register = () => {
       }
     }
     
-    // Check email availability when user finishes typing
     if (name === 'email') {
       setEmailAvailable(null)
+      setEmailExists(null)
+      
+      // Clear previous timeouts
+      clearTimeout(window.emailExistenceTimeout)
       clearTimeout(window.emailCheckTimeout)
-      window.emailCheckTimeout = setTimeout(() => {
-        checkEmailAvailability(value)
-      }, 800)
+      
+      // First check email existence, then availability
+      window.emailExistenceTimeout = setTimeout(() => {
+        validateEmailExistence(value).then(() => {
+          // Only check availability if email exists
+          if (emailExists !== false) {
+            checkEmailAvailability(value)
+          }
+        })
+      }, 1000)
     }
 
-    // Check phone availability when user finishes typing
     if (name === 'phone') {
       setPhoneAvailable(null)
       clearTimeout(window.phoneCheckTimeout)
@@ -339,11 +381,16 @@ const Register = () => {
     e.preventDefault()
     
     if (!validateForm()) {
-      toast.error('Please fix the errors in the form')
+      toast.error('Please fix the errors in the form', { duration: 3000 })
       return
     }
 
-    // Directly submit - email verification will catch invalid emails
+    // Final check: ensure email exists
+    if (emailExists === false) {
+      toast.error("Cannot register with an email that doesn't exist", { duration: 4000 })
+      return
+    }
+
     console.log('Submitting registration:', { ...formData, password: '***' })
     registerMutation.mutate(formData)
   }
@@ -351,6 +398,22 @@ const Register = () => {
   const handleGoogleLogin = () => {
     const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
     window.location.href = `${backendUrl}/api/auth/google`
+  }
+
+  const getEmailStatusIcon = () => {
+    if (validatingEmail || checkingEmail) {
+      return <Loader className="w-5 h-5 text-gray-400 animate-spin" />
+    }
+    if (emailExists === false) {
+      return <XCircle className="w-5 h-5 text-red-500" />
+    }
+    if (emailAvailable === false) {
+      return <XCircle className="w-5 h-5 text-red-500" />
+    }
+    if (emailExists === true && emailAvailable === true) {
+      return <CheckCircle className="w-5 h-5 text-green-500" />
+    }
+    return null
   }
 
   return (
@@ -390,6 +453,7 @@ const Register = () => {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* Name Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('name')} <span className="text-red-500">*</span>
@@ -408,31 +472,25 @@ const Register = () => {
               />
               {checkingName && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Loader className="w-5 h-5 text-gray-400 animate-spin" />
                 </div>
               )}
               {nameAvailable === true && !checkingName && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
               )}
             </div>
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             {nameAvailable === true && !errors.name && (
               <p className="text-green-600 text-xs mt-1 flex items-center">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+                <CheckCircle className="w-3 h-3 mr-1" />
                 Name is available
               </p>
             )}
           </div>
 
+          {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('email')} <span className="text-red-500">*</span>
@@ -445,44 +503,32 @@ const Register = () => {
                 onChange={handleChange}
                 placeholder="your.email@example.com"
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                  errors.email ? 'border-red-500' : emailAvailable === true ? 'border-green-500' : 'border-gray-300'
+                  errors.email ? 'border-red-500' : (emailExists === true && emailAvailable === true) ? 'border-green-500' : 'border-gray-300'
                 }`}
                 required
               />
-              {checkingEmail && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-              )}
-              {emailAvailable === true && !checkingEmail && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                {getEmailStatusIcon()}
+              </div>
             </div>
             {errors.email && (
-              <p className="text-red-500 text-xs mt-1">
+              <p className="text-red-500 text-xs mt-1 flex items-center">
+                <XCircle className="w-3 h-3 mr-1" />
                 {errors.email}
                 {errors.email === 'This email is already registered' && (
-                  <> <Link to="/login" className="underline">Login instead?</Link></>
+                  <> <Link to="/login" className="underline ml-1">Login instead?</Link></>
                 )}
               </p>
             )}
-            {emailAvailable === true && !errors.email && (
+            {emailExists === true && emailAvailable === true && !errors.email && (
               <p className="text-green-600 text-xs mt-1 flex items-center">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Email is available
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Email is valid and available
               </p>
             )}
           </div>
 
+          {/* Phone Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('phone')} <span className="text-red-500">*</span>
@@ -501,32 +547,25 @@ const Register = () => {
               />
               {checkingPhone && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Loader className="w-5 h-5 text-gray-400 animate-spin" />
                 </div>
               )}
               {phoneAvailable === true && !checkingPhone && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
               )}
             </div>
             {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             {phoneAvailable === true && !errors.phone && (
               <p className="text-green-600 text-xs mt-1 flex items-center">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+                <CheckCircle className="w-3 h-3 mr-1" />
                 Phone number is available
               </p>
             )}
-            {!errors.phone && !phoneAvailable && <p className="text-xs text-gray-500 mt-1">Myanmar phone number format</p>}
           </div>
 
+          {/* Password Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('password')} <span className="text-red-500">*</span>
@@ -550,16 +589,11 @@ const Register = () => {
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
                 tabIndex="-1"
               >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             
-            {/* Password Strength Indicator */}
             {formData.password && !errors.password && (
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-1">
@@ -589,6 +623,7 @@ const Register = () => {
             )}
           </div>
 
+          {/* Education Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('education')}
@@ -607,15 +642,12 @@ const Register = () => {
 
           <button
             type="submit"
-            disabled={registerMutation.isPending}
+            disabled={registerMutation.isPending || validatingEmail || checkingEmail || emailExists === false}
             className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {registerMutation.isPending ? (
               <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <Loader className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
                 Creating account...
               </span>
             ) : t('submit')}
