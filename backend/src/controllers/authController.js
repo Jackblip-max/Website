@@ -293,7 +293,7 @@ export const register = async (req, res) => {
       })
     }
 
-    // CHECK IF USER EXISTS WITH THIS EMAIL FIRST (before email validation)
+    // CHECK IF USER EXISTS WITH THIS EMAIL FIRST
     const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
     if (userExists) {
       console.log('User already exists:', email)
@@ -302,20 +302,6 @@ export const register = async (req, res) => {
         message: 'User already exists with this email' 
       })
     }
-
-    // Validate email existence before proceeding
-    console.log('🔍 Validating email existence:', email)
-    const emailValidation = await validateGmailAccount(email)
-    
-    if (!emailValidation.valid) {
-      console.log('❌ Email validation failed:', emailValidation.message)
-      return res.status(400).json({
-        success: false,
-        message: emailValidation.message || "Couldn't find your Google Account. Please check your email address."
-      })
-    }
-    
-    console.log('✅ Email validation passed:', email)
 
     // Validate password strength
     if (password.length < 8) {
@@ -383,9 +369,18 @@ export const register = async (req, res) => {
       console.error('❌ Failed to send verification email:', emailError)
       // If email fails, delete the user and return error
       await user.destroy()
+      
+      // Check if it's an email existence issue
+      const isEmailExistenceIssue = 
+        emailError.message?.includes('550') || 
+        emailError.message?.includes('does not exist') ||
+        emailError.message?.includes('Recipient address rejected')
+      
       return res.status(500).json({
         success: false,
-        message: 'Failed to send verification email. Please check your email address and try again.',
+        message: isEmailExistenceIssue 
+          ? 'This email address does not exist or cannot receive messages. Please check your email address.'
+          : 'Failed to send verification email. Please check your email address and try again.',
         error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
       })
     }
