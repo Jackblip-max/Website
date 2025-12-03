@@ -232,47 +232,23 @@ const Register = () => {
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
     onSuccess: (response) => {
-      toast.success(response.message || 'Registration successful! Please check your email to verify your account.', {
-        duration: 6000
+      toast.success('Registration successful! Please check your email to verify your account.', {
+        duration: 5000
       })
-      // Show detailed alert about email verification
-      alert(
-        '✅ Registration Successful!\n\n' +
-        '📧 Verification Email Sent\n\n' +
-        'We have sent a verification email to: ' + formData.email + '\n\n' +
-        'Please follow these steps:\n' +
-        '1. Check your email inbox\n' +
-        '2. Look for an email from MyanVolunteer\n' +
-        '3. Click the verification link in the email\n' +
-        '4. Return here to login\n\n' +
-        '⚠️ Important:\n' +
-        '- Check your spam/junk folder if you don\'t see the email\n' +
-        '- The verification link expires in 24 hours\n' +
-        '- You must verify your email before you can login'
-      )
+      toast.success('📧 Verification email sent to ' + formData.email, {
+        duration: 5000
+      })
       navigate('/login')
     },
     onError: (error) => {
       console.error('Registration error:', error)
       const message = error.response?.data?.message || 'Registration failed. Please try again.'
       
-      // Show specific error if email sending failed
-      if (message.includes('verification email')) {
-        toast.error(
-          'Failed to send verification email. Please check your email address is correct and try again.',
-          { duration: 6000 }
-        )
-        alert(
-          '❌ Email Verification Failed\n\n' +
-          'We could not send a verification email to: ' + formData.email + '\n\n' +
-          'Possible reasons:\n' +
-          '- The email address may not exist\n' +
-          '- The email address may be incorrect\n' +
-          '- Email server is temporarily unavailable\n\n' +
-          'Please check your email address and try again.'
-        )
+      // Show specific error if email sending failed or email validation failed
+      if (message.includes('verification email') || message.includes("Couldn't find")) {
+        toast.error(message, { duration: 5000 })
       } else {
-        toast.error(message)
+        toast.error(message, { duration: 4000 })
       }
     }
   })
@@ -367,66 +343,9 @@ const Register = () => {
       return
     }
 
-    // Show loading toast
-    const loadingToast = toast.loading('Validating your email address...')
-
-    // Validate email existence first
-    fetch(`${import.meta.env.VITE_API_URL}/auth/validate-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email: formData.email.trim().toLowerCase() })
-    })
-      .then(response => response.json())
-      .then(data => {
-        toast.dismiss(loadingToast)
-        
-        if (!data.valid) {
-          // Email doesn't exist or is invalid
-          const message = data.message || "Couldn't find your Google Account"
-          
-          toast.error(message, { duration: 5000 })
-          
-          // Show detailed alert
-          alert(
-            '❌ Email Validation Failed\n\n' +
-            message + '\n\n' +
-            'Please check:\n' +
-            '• Your email address is spelled correctly\n' +
-            '• Your Google account exists\n' +
-            '• You have access to this email address\n\n' +
-            'For Gmail accounts:\n' +
-            '• Username must be 6-30 characters\n' +
-            '• Cannot start or end with a period (.)\n' +
-            '• Cannot have consecutive periods (..)'
-          )
-          
-          // Focus on email input
-          document.querySelector('input[name="email"]')?.focus()
-          return
-        }
-        
-        // Email is valid, proceed with registration
-        console.log('✅ Email validated, proceeding with registration:', formData.email)
-        registerMutation.mutate(formData)
-      })
-      .catch(error => {
-        toast.dismiss(loadingToast)
-        console.error('Email validation error:', error)
-        
-        // If validation service fails, show warning but allow registration
-        const proceed = window.confirm(
-          '⚠️ Unable to validate email address\n\n' +
-          'We couldn\'t verify your email address at this time.\n\n' +
-          'Do you want to proceed with registration anyway?\n\n' +
-          'Note: You will need access to this email to verify your account.'
-        )
-        
-        if (proceed) {
-          registerMutation.mutate(formData)
-        }
-      })
+    // Directly submit - email verification will catch invalid emails
+    console.log('Submitting registration:', { ...formData, password: '***' })
+    registerMutation.mutate(formData)
   }
 
   const handleGoogleLogin = () => {
