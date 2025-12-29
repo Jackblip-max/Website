@@ -76,7 +76,7 @@ const DynamicBackground = ({ category = 'volunteer', overlay = 0.7, children }) 
   }, [currentImageIndex, images])
 
   return (
-    <div className="relative">
+    <div className="relative min-h-screen">
       {/* Background Images Container - FIXED but behind everything */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {images.map((image, index) => (
@@ -121,12 +121,12 @@ const DynamicBackground = ({ category = 'volunteer', overlay = 0.7, children }) 
       </div>
 
       {/* Content - This now flows normally and footer will be visible */}
-      <div className="relative z-10">
+      <div className="relative z-10 min-h-screen">
         {children}
       </div>
 
-      {/* Image Counter/Indicators - Lower z-index so footer is above */}
-      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex gap-2 pointer-events-auto">
+      {/* Image Counter/Indicators */}
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 flex gap-2 pointer-events-auto">
         {images.map((_, index) => (
           <button
             key={index}
