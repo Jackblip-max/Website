@@ -7,54 +7,53 @@ import React, { useState, useEffect } from 'react'
  */
 const DynamicBackground = ({ category = 'volunteer', overlay = 0.7, children }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isLoaded, setIsLoaded] = useState(false)
 
   // Curated Unsplash photo collections for different page types
   const imageCollections = {
     volunteer: [
-      'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1920&q=80', // Volunteers together
-      'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=1920&q=80', // Helping hands
-      'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1920&q=80', // Community service
-      'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=1920&q=80', // Nature volunteer
-      'https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?w=1920&q=80', // Food distribution
+      'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1920&q=80',
+      'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=1920&q=80',
+      'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1920&q=80',
+      'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=1920&q=80',
+      'https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?w=1920&q=80',
     ],
     community: [
-      'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=1920&q=80', // People gathering
-      'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=1920&q=80', // Community event
-      'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=1920&q=80', // Diverse group
-      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1920&q=80', // Team collaboration
+      'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=1920&q=80',
+      'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=1920&q=80',
+      'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=1920&q=80',
+      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1920&q=80',
     ],
     education: [
-      'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&q=80', // Teaching
-      'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1920&q=80', // Children learning
-      'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&q=80', // Classroom
-      'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1920&q=80', // Books and learning
+      'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&q=80',
+      'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1920&q=80',
+      'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920&q=80',
+      'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1920&q=80',
     ],
     environment: [
-      'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1920&q=80', // Tree planting
-      'https://images.unsplash.com/photo-1618477388954-7852f32655ec?w=1920&q=80', // Beach cleanup
-      'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=1920&q=80', // Nature conservation
-      'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1920&q=80', // Sustainability
+      'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1920&q=80',
+      'https://images.unsplash.com/photo-1618477388954-7852f32655ec?w=1920&q=80',
+      'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=1920&q=80',
+      'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=1920&q=80',
     ],
     healthcare: [
-      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&q=80', // Medical volunteers
-      'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=1920&q=80', // Healthcare workers
-      'https://images.unsplash.com/photo-1631815589968-fdb09a223b1e?w=1920&q=80', // Caring hands
+      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&q=80',
+      'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=1920&q=80',
+      'https://images.unsplash.com/photo-1631815589968-fdb09a223b1e?w=1920&q=80',
     ],
     organization: [
-      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1920&q=80', // Team meeting
-      'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=80', // Office collaboration
-      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1920&q=80', // Professional workspace
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1920&q=80',
+      'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1920&q=80',
+      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1920&q=80',
     ],
     success: [
-      'https://images.unsplash.com/photo-1513351732705-4f1e6c114bc9?w=1920&q=80', // Celebration
-      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1920&q=80', // Success moment
-      'https://images.unsplash.com/photo-1521791055366-0d553872125f?w=1920&q=80', // Achievement
+      'https://images.unsplash.com/photo-1513351732705-4f1e6c114bc9?w=1920&q=80',
+      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=1920&q=80',
+      'https://images.unsplash.com/photo-1521791055366-0d553872125f?w=1920&q=80',
     ],
     minimal: [
-      'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1920&q=80', // Clean gradient
-      'https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=1920&q=80', // Soft colors
-      'https://images.unsplash.com/photo-1557682268-e3955ed5d83f?w=1920&q=80', // Abstract minimal
+      'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1920&q=80',
+      'https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=1920&q=80',
+      'https://images.unsplash.com/photo-1557682268-e3955ed5d83f?w=1920&q=80',
     ]
   }
 
@@ -145,6 +144,10 @@ const DynamicBackground = ({ category = 'volunteer', overlay = 0.7, children }) 
       <style jsx>{`
         .transition-opacity {
           transition: opacity 2s ease-in-out;
+        }
+
+        .duration-2000 {
+          transition-duration: 2000ms;
         }
 
         .particles-container {
