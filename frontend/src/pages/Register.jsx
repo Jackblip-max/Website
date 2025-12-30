@@ -30,7 +30,111 @@ const Register = () => {
   const [nameAvailable, setNameAvailable] = useState(null)
   const [phoneAvailable, setPhoneAvailable] = useState(null)
 
-  // ... (Keep all your existing validation functions)
+  const validatePassword = (password) => {
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumbers = /\d/.test(password)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    const isLongEnough = password.length >= 8
+
+    if (!isLongEnough) return 'weak'
+    
+    const score = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length
+    
+    if (score === 4) return 'strong'
+    if (score >= 2) return 'medium'
+    return 'weak'
+  }
+
+  const checkEmailAvailability = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailAvailable(null)
+      return
+    }
+
+    setCheckingEmail(true)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      const data = await response.json()
+      setEmailAvailable(data.available)
+    } catch (error) {
+      console.error('Email check error:', error)
+    } finally {
+      setCheckingEmail(false)
+    }
+  }
+
+  const validateEmailExistence = async (email) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailExists(null)
+      return
+    }
+
+    setValidatingEmail(true)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/validate-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      const data = await response.json()
+      setEmailExists(data.valid)
+    } catch (error) {
+      console.error('Email validation error:', error)
+      setEmailExists(null)
+    } finally {
+      setValidatingEmail(false)
+    }
+  }
+
+  const checkNameAvailability = async (name) => {
+    if (!name || name.length < 2) {
+      setNameAvailable(null)
+      return
+    }
+
+    setCheckingName(true)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      const data = await response.json()
+      setNameAvailable(data.available)
+    } catch (error) {
+      console.error('Name check error:', error)
+    } finally {
+      setCheckingName(false)
+    }
+  }
+
+  const checkPhoneAvailability = async (phone) => {
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    if (!cleanPhone || !/^(\+?95|0?9)\d{7,10}$/.test(cleanPhone)) {
+      setPhoneAvailable(null)
+      return
+    }
+
+    setCheckingPhone(true)
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone })
+      })
+      const data = await response.json()
+      setPhoneAvailable(data.available)
+    } catch (error) {
+      console.error('Phone check error:', error)
+    } finally {
+      setCheckingPhone(false)
+    }
+  }
 
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
@@ -49,18 +153,96 @@ const Register = () => {
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
-    // ... (Keep your validation logic)
+    setErrors(prev => ({ ...prev, [name]: '' }))
+
+    if (name === 'password') {
+      setPasswordStrength(validatePassword(value))
+    }
+
+    if (name === 'email') {
+      const debounceTimer = setTimeout(() => {
+        checkEmailAvailability(value)
+        validateEmailExistence(value)
+      }, 500)
+      return () => clearTimeout(debounceTimer)
+    }
+
+    if (name === 'name') {
+      const debounceTimer = setTimeout(() => {
+        checkNameAvailability(value)
+      }, 500)
+      return () => clearTimeout(debounceTimer)
+    }
+
+    if (name === 'phone') {
+      const debounceTimer = setTimeout(() => {
+        checkPhoneAvailability(value)
+      }, 500)
+      return () => clearTimeout(debounceTimer)
+    }
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    // ... (Keep your validation logic)
-    registerMutation.mutate(formData)
+    
+    const newErrors = {}
+    
+    if (!formData.name || formData.name.length < 2) {
+      newErrors.name = 'Name must be at least 2 characters'
+    }
+    
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email'
+    }
+    
+    if (emailAvailable === false) {
+      newErrors.email = 'This email is already registered'
+    }
+    
+    if (emailExists === false) {
+      newErrors.email = 'This email address does not exist'
+    }
+    
+    if (nameAvailable === false) {
+      newErrors.name = 'This name is already taken'
+    }
+    
+    const cleanPhone = formData.phone.replace(/[\s\-\(\)]/g, '')
+    if (!cleanPhone || !/^(\+?95|0?9)\d{7,10}$/.test(cleanPhone)) {
+      newErrors.phone = 'Please enter a valid Myanmar phone number'
+    }
+    
+    if (phoneAvailable === false) {
+      newErrors.phone = 'This phone number is already registered'
+    }
+    
+    if (!formData.password || formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters'
+    }
+    
+    if (passwordStrength === 'weak') {
+      newErrors.password = 'Password is too weak. Add uppercase, lowercase, numbers, and special characters'
+    }
+    
+    setErrors(newErrors)
+    
+    if (Object.keys(newErrors).length === 0) {
+      registerMutation.mutate(formData)
+    }
   }
 
   const handleGoogleLogin = () => {
     const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
     window.location.href = `${backendUrl}/api/auth/google`
+  }
+
+  const getPasswordStrengthColor = () => {
+    switch(passwordStrength) {
+      case 'strong': return 'bg-green-500'
+      case 'medium': return 'bg-yellow-500'
+      case 'weak': return 'bg-red-500'
+      default: return 'bg-gray-300'
+    }
   }
 
   return (
@@ -102,12 +284,164 @@ const Register = () => {
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Keep all your existing form fields */}
-            {/* Just make sure inputs have nice styling */}
-            
+            {/* Name Field */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                {t('name')} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="John Doe"
+                  className={`w-full px-4 py-3 pr-10 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium ${
+                    errors.name ? 'border-red-500' : nameAvailable === true ? 'border-green-500' : nameAvailable === false ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  required
+                />
+                {checkingName && (
+                  <LoaderIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                )}
+                {!checkingName && nameAvailable === true && (
+                  <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+                {!checkingName && nameAvailable === false && (
+                  <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-500" />
+                )}
+              </div>
+              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+              {nameAvailable === false && <p className="text-red-500 text-xs mt-1">This name is already taken</p>}
+              {nameAvailable === true && <p className="text-green-500 text-xs mt-1">Name is available</p>}
+            </div>
+
+            {/* Email Field */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                {t('email')} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="your.email@example.com"
+                  className={`w-full px-4 py-3 pr-10 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium ${
+                    errors.email ? 'border-red-500' : emailAvailable === true && emailExists === true ? 'border-green-500' : emailAvailable === false || emailExists === false ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  required
+                />
+                {(checkingEmail || validatingEmail) && (
+                  <LoaderIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                )}
+                {!checkingEmail && !validatingEmail && emailAvailable === true && emailExists === true && (
+                  <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+                {!checkingEmail && !validatingEmail && (emailAvailable === false || emailExists === false) && (
+                  <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-500" />
+                )}
+              </div>
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+              {emailAvailable === false && <p className="text-red-500 text-xs mt-1">This email is already registered</p>}
+              {emailExists === false && <p className="text-red-500 text-xs mt-1">This email address does not exist</p>}
+              {emailAvailable === true && emailExists === true && <p className="text-green-500 text-xs mt-1">Email is valid and available</p>}
+            </div>
+
+            {/* Phone Field */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                {t('phone')} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+95 9xxxxxxxxx or 09xxxxxxxxx"
+                  className={`w-full px-4 py-3 pr-10 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium ${
+                    errors.phone ? 'border-red-500' : phoneAvailable === true ? 'border-green-500' : phoneAvailable === false ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  required
+                />
+                {checkingPhone && (
+                  <LoaderIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                )}
+                {!checkingPhone && phoneAvailable === true && (
+                  <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+                {!checkingPhone && phoneAvailable === false && (
+                  <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-red-500" />
+                )}
+              </div>
+              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+              {phoneAvailable === false && <p className="text-red-500 text-xs mt-1">This phone number is already registered</p>}
+              {phoneAvailable === true && <p className="text-green-500 text-xs mt-1">Phone number is available</p>}
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                {t('password')} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Min. 8 characters"
+                  className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  tabIndex="-1"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {formData.password && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`h-full transition-all ${getPasswordStrengthColor()}`} style={{width: passwordStrength === 'strong' ? '100%' : passwordStrength === 'medium' ? '66%' : '33%'}}></div>
+                    </div>
+                    <span className={`text-xs font-bold ${passwordStrength === 'strong' ? 'text-green-500' : passwordStrength === 'medium' ? 'text-yellow-500' : 'text-red-500'}`}>
+                      {passwordStrength === 'strong' ? 'Strong' : passwordStrength === 'medium' ? 'Medium' : 'Weak'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">Use uppercase, lowercase, numbers & special characters</p>
+                </div>
+              )}
+              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            </div>
+
+            {/* Education Field */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">{t('education')}</label>
+              <select
+                name="education"
+                value={formData.education}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
+              >
+                <option value="highSchool">{t('highSchool')}</option>
+                <option value="undergraduate">{t('undergraduate')}</option>
+                <option value="graduate">{t('graduate')}</option>
+              </select>
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
-              disabled={registerMutation.isPending || validatingEmail || checkingEmail || emailExists === false}
+              disabled={registerMutation.isPending || validatingEmail || checkingEmail || emailExists === false || emailAvailable === false || nameAvailable === false || phoneAvailable === false}
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-xl hover:from-emerald-700 hover:to-teal-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-xl"
             >
               {registerMutation.isPending ? (
