@@ -35,7 +35,6 @@ export const validateEmailExistence = async (req, res) => {
 
     console.log('🔍 Validating email existence:', email)
 
-    // Validate email format first
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -45,7 +44,6 @@ export const validateEmailExistence = async (req, res) => {
       })
     }
 
-    // Check if it's a Gmail account and validate
     const validation = await validateGmailAccount(email)
     
     console.log('📧 Email validation result:', validation)
@@ -87,7 +85,6 @@ export const checkEmailAvailability = async (req, res) => {
       })
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -96,7 +93,6 @@ export const checkEmailAvailability = async (req, res) => {
       })
     }
 
-    // Check if email exists
     const existingUser = await User.findOne({ 
       where: { email: email.trim().toLowerCase() } 
     })
@@ -129,7 +125,6 @@ export const checkNameAvailability = async (req, res) => {
       })
     }
 
-    // Validate name format
     const trimmedName = name.trim()
     
     if (trimmedName.length < 2) {
@@ -146,7 +141,6 @@ export const checkNameAvailability = async (req, res) => {
       })
     }
 
-    // Check if name exists (case-insensitive for MySQL)
     const existingUser = await User.findOne({ 
       where: sequelize.where(
         sequelize.fn('LOWER', sequelize.col('name')),
@@ -182,7 +176,6 @@ export const checkPhoneAvailability = async (req, res) => {
       })
     }
 
-    // Clean and validate phone format
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
     
@@ -193,7 +186,6 @@ export const checkPhoneAvailability = async (req, res) => {
       })
     }
 
-    // Check if phone exists
     const existingUser = await User.findOne({ 
       where: { phone: cleanPhone } 
     })
@@ -221,7 +213,6 @@ export const register = async (req, res) => {
     
     const { name, email, phone, password, education } = req.body
 
-    // Validate required fields
     if (!name || !email || !phone || !password) {
       console.log('❌ Missing required fields')
       return res.status(400).json({ 
@@ -230,7 +221,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Validate name
     const trimmedName = name.trim()
     
     if (trimmedName.length < 2) {
@@ -247,7 +237,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if name already exists
     const nameExists = await User.findOne({ 
       where: sequelize.where(
         sequelize.fn('LOWER', sequelize.col('name')),
@@ -263,7 +252,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Validate phone format
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
     if (!phoneRegex.test(cleanPhone)) {
@@ -274,7 +262,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if phone number already exists
     const phoneExists = await User.findOne({ where: { phone: cleanPhone } })
     if (phoneExists) {
       return res.status(400).json({
@@ -283,7 +270,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       console.log('❌ Invalid email format:', email)
@@ -293,7 +279,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if user exists with this email
     const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
     if (userExists) {
       console.log('❌ User already exists:', email)
@@ -303,7 +288,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Validate password strength
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
@@ -337,19 +321,16 @@ export const register = async (req, res) => {
       })
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10)
     const hashedPassword = await bcrypt.hash(password, salt)
     console.log('✅ Password hashed successfully')
 
-    // Generate verification token
     const verificationToken = generateVerificationToken()
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
     console.log('📧 Generated verification token:', verificationToken)
     console.log('📧 Token expires at:', verificationExpires)
 
-    // Create user
     const user = await User.create({
       name: trimmedName,
       email: email.trim().toLowerCase(),
@@ -364,11 +345,9 @@ export const register = async (req, res) => {
     console.log('✅ User created successfully:', user.id)
     console.log('📧 Verification token saved:', user.verificationToken ? 'Yes' : 'No')
 
-    // Verify the token was saved
     const savedUser = await User.findByPk(user.id)
     console.log('📧 Token verification check - Saved in DB:', savedUser.verificationToken ? 'Yes' : 'No')
 
-    // Send verification email
     try {
       const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
       console.log('📧 Verification URL:', verificationUrl)
@@ -386,7 +365,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Create volunteer profile
     await Volunteer.create({
       userId: user.id,
       education: education || 'undergraduate',
@@ -396,10 +374,8 @@ export const register = async (req, res) => {
 
     console.log('✅ Volunteer profile created successfully')
 
-    // Generate token
     const token = generateToken(user.id)
 
-    // Return response
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -440,7 +416,6 @@ export const login = async (req, res) => {
     
     const { email, password } = req.body
 
-    // Validate input
     if (!email || !password) {
       console.log('❌ Missing credentials')
       return res.status(400).json({ 
@@ -449,7 +424,6 @@ export const login = async (req, res) => {
       })
     }
 
-    // Check if user exists
     console.log('🔍 Searching for user:', email.trim().toLowerCase())
     const user = await User.findOne({ 
       where: { email: email.trim().toLowerCase() },
@@ -469,8 +443,8 @@ export const login = async (req, res) => {
 
     console.log('✅ User found:', user.id)
     console.log('📧 User verified status:', user.isVerified)
+    console.log('🏢 Has organization:', !!user.organization)
 
-    // Check if user has a password
     if (!user.password) {
       console.log('❌ User has no password')
       return res.status(401).json({ 
@@ -479,7 +453,6 @@ export const login = async (req, res) => {
       })
     }
 
-    // Check password
     console.log('🔐 Comparing passwords...')
     const isPasswordValid = await bcrypt.compare(password, user.password)
     console.log('🔐 Password valid:', isPasswordValid)
@@ -492,7 +465,6 @@ export const login = async (req, res) => {
       })
     }
 
-    // CHECK IF EMAIL IS VERIFIED
     if (!user.isVerified) {
       console.log('❌ User email not verified:', user.email)
       return res.status(403).json({ 
@@ -506,11 +478,9 @@ export const login = async (req, res) => {
     console.log('✅ Password validated successfully')
     console.log('✅ User is verified')
 
-    // Generate token
     const token = generateToken(user.id)
     console.log('✅ Token generated')
 
-    // Prepare user response
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -560,6 +530,8 @@ export const login = async (req, res) => {
 // @access  Private
 export const getProfile = async (req, res) => {
   try {
+    console.log('📋 Getting profile for user:', req.user.id)
+    
     const user = await User.findByPk(req.user.id, {
       include: [
         { model: Volunteer, as: 'volunteer' },
@@ -575,6 +547,13 @@ export const getProfile = async (req, res) => {
       })
     }
 
+    console.log('✅ User found:', user.email)
+    console.log('📊 Has organization:', !!user.organization)
+    if (user.organization) {
+      console.log('🏢 Organization ID:', user.organization.id)
+      console.log('🏢 Organization Name:', user.organization.name)
+    }
+
     res.json({
       success: true,
       id: user.id,
@@ -585,12 +564,24 @@ export const getProfile = async (req, res) => {
       isVerified: user.isVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      volunteer: user.volunteer,
-      organization: user.organization,
-      organizationId: user.organization?.id
+      volunteer: user.volunteer ? {
+        id: user.volunteer.id,
+        education: user.volunteer.education,
+        skills: user.volunteer.skills,
+        notificationsEnabled: user.volunteer.notificationsEnabled
+      } : null,
+      organization: user.organization ? {
+        id: user.organization.id,
+        name: user.organization.name,
+        description: user.organization.description,
+        contactDetails: user.organization.contactDetails,
+        logo: user.organization.logo,
+        isVerified: user.organization.isVerified
+      } : null,
+      organizationId: user.organization?.id || null
     })
   } catch (error) {
-    console.error('Get profile error:', error)
+    console.error('❌ Get profile error:', error)
     res.status(500).json({ 
       success: false,
       message: 'Failed to get profile',
@@ -614,7 +605,6 @@ export const updateProfile = async (req, res) => {
       })
     }
 
-    // Update user basic info
     if (name) {
       if (name.trim().length < 2) {
         return res.status(400).json({
@@ -639,7 +629,6 @@ export const updateProfile = async (req, res) => {
     
     await user.save()
 
-    // Update volunteer profile if exists
     if (user.role === 'volunteer') {
       const volunteer = await Volunteer.findOne({ where: { userId: user.id } })
       if (volunteer) {
@@ -651,7 +640,6 @@ export const updateProfile = async (req, res) => {
       }
     }
 
-    // Return updated user
     const updatedUser = await User.findByPk(user.id, {
       include: [
         { model: Volunteer, as: 'volunteer' },
@@ -704,11 +692,8 @@ export const verifyEmail = async (req, res) => {
       })
     }
 
-    // Find user with this token
     const user = await User.findOne({
-      where: {
-        verificationToken: token
-      }
+      where: { verificationToken: token }
     })
 
     if (!user) {
@@ -721,7 +706,6 @@ export const verifyEmail = async (req, res) => {
 
     console.log('✅ User found:', user.email)
 
-    // Check if already verified
     if (user.isVerified) {
       console.log('ℹ️ User already verified:', user.email)
       return res.json({
@@ -730,7 +714,6 @@ export const verifyEmail = async (req, res) => {
       })
     }
 
-    // Check if token has expired
     if (user.verificationExpires && new Date() > user.verificationExpires) {
       console.log('❌ Token expired for user:', user.email)
       return res.status(400).json({
@@ -740,7 +723,6 @@ export const verifyEmail = async (req, res) => {
       })
     }
 
-    // Verify the user
     user.isVerified = true
     user.verificationToken = null
     user.verificationExpires = null
@@ -748,13 +730,11 @@ export const verifyEmail = async (req, res) => {
 
     console.log('✅ User verified successfully:', user.email)
 
-    // Send welcome email
     try {
       await sendWelcomeEmail(user.email, user.name)
       console.log('✅ Welcome email sent to:', user.email)
     } catch (emailError) {
       console.error('⚠️ Failed to send welcome email:', emailError)
-      // Continue even if welcome email fails
     }
 
     res.json({
@@ -803,7 +783,6 @@ export const resendVerification = async (req, res) => {
       })
     }
 
-    // Generate new verification token
     const verificationToken = generateVerificationToken()
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
@@ -811,7 +790,6 @@ export const resendVerification = async (req, res) => {
     user.verificationExpires = verificationExpires
     await user.save()
 
-    // Send verification email
     await sendVerificationEmail(user.email, user.name, verificationToken)
 
     res.json({
@@ -845,7 +823,6 @@ export const completeProfile = async (req, res) => {
       })
     }
 
-    // Validate phone
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
     if (!phoneRegex.test(cleanPhone)) {
@@ -863,13 +840,11 @@ export const completeProfile = async (req, res) => {
       })
     }
 
-    // Update user phone
     user.phone = cleanPhone
     await user.save()
 
     console.log('User updated:', user.id)
 
-    // Update or create volunteer profile
     let volunteer = await Volunteer.findOne({ where: { userId: user.id } })
     
     if (!volunteer) {
@@ -887,7 +862,6 @@ export const completeProfile = async (req, res) => {
       })
     }
 
-    // Return updated user with volunteer profile
     const updatedUser = await User.findByPk(user.id, {
       include: [
         { model: Volunteer, as: 'volunteer' },
