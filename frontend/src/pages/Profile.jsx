@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
-import { Edit2, Save, X } from 'lucide-react'
+import { Edit2, Save, X, Building2, Plus } from 'lucide-react'
 
 const Profile = () => {
   const { t } = useLanguage()
@@ -130,30 +130,7 @@ const Profile = () => {
         </div>
 
         {/* Profile Information Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">{t('myProfile')}</h1>
-          {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-medium"
-            >
-              <Edit2 className="w-4 h-4" />
-              <span>{t('edit')}</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleCancel}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-700 font-medium"
-            >
-              <X className="w-4 h-4" />
-              <span>Cancel</span>
-            </button>
-          )}
-        </div>
-
-        {/* Profile Information Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Profile Information</h2>
             {!isEditing ? (
@@ -176,67 +153,32 @@ const Profile = () => {
           </div>
 
           {!isEditing ? (
-            // View Mode - Display Information
-            <div className="space-y-8">
-              {/* Basic Information Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-emerald-500">
-                  📋 Basic Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
-                    <p className="text-lg text-gray-900 font-medium">{user.name || 'Not provided'}</p>
-                  </div>
+            // View Mode - Display Basic Information Only
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
+                  <p className="text-lg text-gray-900 font-medium">{user.name || 'Not provided'}</p>
+                </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Email Address</label>
-                    <p className="text-lg text-gray-900">{user.email}</p>
-                  </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Email Address</label>
+                  <p className="text-lg text-gray-900">{user.email}</p>
+                </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Phone Number</label>
-                    <p className="text-lg text-gray-900">{user.phone || 'Not provided'}</p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Account Type</label>
-                    <p className="text-lg text-gray-900 capitalize font-medium">
-                      {user.role === 'volunteer' ? 'Volunteer' : 'Organization'}
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Account Status</label>
-                    <p className="text-lg text-gray-900">
-                      {user.isVerified ? (
-                        <span className="text-green-600 font-medium">✓ Verified</span>
-                      ) : (
-                        <span className="text-orange-600 font-medium">⚠ Not Verified</span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <label className="block text-sm font-medium text-gray-500 mb-1">Member Since</label>
-                    <p className="text-lg text-gray-900">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      }) : 'N/A'}
-                    </p>
-                  </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Phone Number</label>
+                  <p className="text-lg text-gray-900">{user.phone || 'Not provided'}</p>
                 </div>
               </div>
 
-              {/* Volunteer Information Section */}
+              {/* Additional Info for Volunteers */}
               {user.role === 'volunteer' && user.volunteer && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-emerald-500">
-                    🎓 Volunteer Information
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Additional Information
                   </h3>
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <label className="block text-sm font-medium text-gray-500 mb-1">Education Level</label>
                       <p className="text-lg text-gray-900 capitalize font-medium">
@@ -244,13 +186,6 @@ const Profile = () => {
                          user.volunteer.education === 'undergraduate' ? 'Undergraduate' :
                          user.volunteer.education === 'graduate' ? 'Graduate' :
                          user.volunteer.education}
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-500 mb-1">Skills & Expertise</label>
-                      <p className="text-lg text-gray-900">
-                        {user.volunteer.skills || 'No skills specified yet'}
                       </p>
                     </div>
 
@@ -263,34 +198,13 @@ const Profile = () => {
                           <span className="text-gray-600 font-medium">✗ Disabled</span>
                         )}
                       </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Receive deadline reminders and application updates
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Skills & Expertise</label>
+                      <p className="text-lg text-gray-900">
+                        {user.volunteer.skills || 'No skills specified yet'}
                       </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Organization Information Section */}
-              {user.role === 'organization' && user.organization && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-emerald-500">
-                    🏢 Organization Information
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-500 mb-1">Organization Name</label>
-                      <p className="text-lg text-gray-900 font-medium">{user.organization.name}</p>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-500 mb-1">Description</label>
-                      <p className="text-lg text-gray-900">{user.organization.description}</p>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-500 mb-1">Contact Details</label>
-                      <p className="text-lg text-gray-900">{user.organization.contactDetails}</p>
                     </div>
                   </div>
                 </div>
@@ -420,6 +334,26 @@ const Profile = () => {
             </form>
           )}
         </div>
+
+        {/* Create Organization CTA - Only show if user is volunteer and has NO organization */}
+        {user.role === 'volunteer' && !user.organization && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-8 text-center">
+            <Building2 className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Want to post volunteer opportunities?
+            </h3>
+            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+              Create your organization profile to start posting volunteer opportunities and managing applications.
+            </p>
+            <Link
+              to="/create-organization"
+              className="inline-flex items-center space-x-2 bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 font-bold transition-colors shadow-lg"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Create Organization</span>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
