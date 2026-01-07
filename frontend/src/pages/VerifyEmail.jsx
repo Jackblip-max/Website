@@ -6,7 +6,7 @@ import Loader from '../components/common/Loader'
 const VerifyEmail = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [status, setStatus] = useState('verifying') // verifying, success, error, expired, already_verified
+  const [status, setStatus] = useState('verifying')
   const [message, setMessage] = useState('')
   const [resending, setResending] = useState(false)
   const [userEmail, setUserEmail] = useState('')
@@ -38,24 +38,37 @@ const VerifyEmail = () => {
       const data = await response.json()
       console.log('Verification response data:', data)
 
-      if (data.success) {
-        setStatus('success')
-        setMessage(data.message)
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login')
-        }, 3000)
+      // Check if response is successful (200 status) OR if data.success is true
+      if (response.ok || data.success) {
+        // Check if message indicates already verified
+        if (data.message?.toLowerCase().includes('already verified')) {
+          setStatus('already_verified')
+          setMessage(data.message || 'Your email has already been verified. You can login now!')
+        } else {
+          setStatus('success')
+          setMessage(data.message || 'Email verified successfully! You can now login.')
+          
+          // Redirect to login after 3 seconds
+          setTimeout(() => {
+            navigate('/login')
+          }, 3000)
+        }
       } else {
-        // Check if token expired
+        // Check specific error types
         if (data.expired) {
           setStatus('expired')
-        } else if (data.message?.includes('already verified')) {
+          setMessage(data.message || 'Verification link has expired. Please request a new one.')
+        } else if (data.message?.toLowerCase().includes('already been used')) {
+          // Token was already used - treat as already verified
           setStatus('already_verified')
+          setMessage('This verification link has already been used. Your email is verified!')
+        } else if (data.message?.toLowerCase().includes('invalid') || data.message?.toLowerCase().includes('not found')) {
+          setStatus('error')
+          setMessage(data.message || 'Invalid verification token.')
         } else {
           setStatus('error')
+          setMessage(data.message || 'Verification failed. Please try again.')
         }
-        setMessage(data.message)
       }
     } catch (error) {
       console.error('Verification error:', error)
@@ -139,8 +152,13 @@ const VerifyEmail = () => {
               <div className="mb-4">
                 <CheckCircle className="w-16 h-16 text-blue-600 mx-auto" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Already Verified</h2>
-              <p className="text-gray-600 mb-6">Your email has already been verified. You can login now!</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Already Verified ✓</h2>
+              <p className="text-gray-600 mb-4">{message}</p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-blue-800 font-medium">✓ Your email is verified</p>
+                <p className="text-blue-700 text-sm mt-1">You can proceed to login to your account.</p>
+              </div>
               
               <Link
                 to="/login"
