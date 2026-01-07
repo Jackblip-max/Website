@@ -96,7 +96,8 @@ const Header = () => {
                       <span>{t('myProfile')}</span>
                     </Link>
 
-                    {user?.organizationId && (
+                    {/* ONLY show "My Organization" if user HAS an organization */}
+                    {user?.organization && (
                       <Link 
                         to="/org-dashboard" 
                         className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
