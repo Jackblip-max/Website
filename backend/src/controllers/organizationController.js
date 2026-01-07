@@ -4,6 +4,8 @@ export const createOrganization = async (req, res) => {
   try {
     const { name, description, contactDetails } = req.body
 
+    console.log('📝 Creating organization for user:', req.user.id)
+
     // Check if user already has an organization
     const existing = await Organization.findOne({ where: { userId: req.user.id } })
     if (existing) {
@@ -12,7 +14,9 @@ export const createOrganization = async (req, res) => {
 
     // Update user role to organization
     await User.update({ role: 'organization' }, { where: { id: req.user.id } })
+    console.log('✅ User role updated to organization')
 
+    // Create organization
     const organization = await Organization.create({
       userId: req.user.id,
       name,
@@ -20,13 +24,23 @@ export const createOrganization = async (req, res) => {
       contactDetails
     })
 
+    console.log('✅ Organization created:', organization.id)
+
+    // Return the created organization with full details
     res.status(201).json({
       success: true,
       message: 'Organization created successfully',
-      data: organization
+      data: {
+        id: organization.id,
+        name: organization.name,
+        description: organization.description,
+        contactDetails: organization.contactDetails,
+        isVerified: organization.isVerified,
+        userId: organization.userId
+      }
     })
   } catch (error) {
-    console.error('Create organization error:', error)
+    console.error('❌ Create organization error:', error)
     res.status(500).json({ message: 'Failed to create organization', error: error.message })
   }
 }
