@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Mail } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import DynamicBackground from '../components/common/DynamicBackground'
@@ -20,7 +20,6 @@ const Login = () => {
   const loginMutation = useMutation({
     mutationFn: async (data) => {
       console.log('🔐 Attempting login with:', { email: data.email, password: '***' })
-      console.log('🔐 Login function:', typeof login)
       
       try {
         const result = await login(data)
@@ -46,11 +45,57 @@ const Login = () => {
       console.error('❌ Login error FULL:', error)
       console.error('❌ Error response:', error.response)
       console.error('❌ Error response data:', error.response?.data)
-      console.error('❌ Error message:', error.message)
-      console.error('❌ Error stack:', error.stack)
       
-      const message = error.response?.data?.message || error.message || 'Login failed'
-      toast.error(message)
+      const errorData = error.response?.data
+      const message = errorData?.message || error.message || 'Login failed'
+      
+      // Check if it's a verification error
+      if (errorData?.needsVerification || error.response?.status === 403) {
+        // Show a more helpful toast with option to resend verification
+        toast((toastInstance) => (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <Mail className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-gray-900 mb-1">Email Not Verified</p>
+                <p className="text-sm text-gray-600">{message}</p>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                toast.dismiss(toastInstance.id)
+                try {
+                  const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/resend-verification`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: errorData?.email || formData.email })
+                  })
+                  const data = await response.json()
+                  if (data.success) {
+                    toast.success('✅ Verification email sent! Please check your inbox.')
+                  } else {
+                    toast.error(data.message || 'Failed to resend verification email')
+                  }
+                } catch (err) {
+                  console.error('Resend verification error:', err)
+                  toast.error('Failed to resend verification email')
+                }
+              }}
+              className="w-full bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm transition-colors"
+            >
+              📧 Resend Verification Email
+            </button>
+          </div>
+        ), {
+          duration: 8000,
+          style: {
+            minWidth: '400px',
+            maxWidth: '500px',
+          },
+        })
+      } else {
+        toast.error(message)
+      }
     }
   })
 
@@ -195,6 +240,13 @@ const Login = () => {
               {t('register')}
             </Link>
           </p>
+
+          {/* Email Verification Notice */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 text-center">
+              <span className="font-semibold">📧 Note:</span> You must verify your email before logging in. Check your inbox after registration.
+            </p>
+          </div>
         </div>
       </div>
     </DynamicBackground>
