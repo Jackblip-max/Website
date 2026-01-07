@@ -217,13 +217,13 @@ export const checkPhoneAvailability = async (req, res) => {
 // @access  Public
 export const register = async (req, res) => {
   try {
-    console.log('Registration request received:', { ...req.body, password: '***' })
+    console.log('📝 Registration request received:', { ...req.body, password: '***' })
     
     const { name, email, phone, password, education } = req.body
 
     // Validate required fields
     if (!name || !email || !phone || !password) {
-      console.log('Missing required fields')
+      console.log('❌ Missing required fields')
       return res.status(400).json({ 
         success: false,
         message: 'Please provide name, email, phone, and password' 
@@ -247,7 +247,7 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if name already exists (case-insensitive for MySQL)
+    // Check if name already exists
     const nameExists = await User.findOne({ 
       where: sequelize.where(
         sequelize.fn('LOWER', sequelize.col('name')),
@@ -256,18 +256,18 @@ export const register = async (req, res) => {
     })
     
     if (nameExists) {
-      console.log('Name already exists:', trimmedName)
+      console.log('❌ Name already exists:', trimmedName)
       return res.status(400).json({ 
         success: false,
         message: 'This name is already taken. Please choose a different name.' 
       })
     }
 
-    // Validate phone format (Myanmar format)
+    // Validate phone format
     const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
     const phoneRegex = /^(\+?95|0?9)\d{7,10}$/
     if (!phoneRegex.test(cleanPhone)) {
-      console.log('Invalid phone format:', phone)
+      console.log('❌ Invalid phone format:', phone)
       return res.status(400).json({ 
         success: false,
         message: 'Please provide a valid Myanmar phone number (e.g., 09xxxxxxxxx or +959xxxxxxxxx)' 
@@ -286,17 +286,17 @@ export const register = async (req, res) => {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      console.log('Invalid email format:', email)
+      console.log('❌ Invalid email format:', email)
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid email address'
       })
     }
 
-    // CHECK IF USER EXISTS WITH THIS EMAIL FIRST
+    // Check if user exists with this email
     const userExists = await User.findOne({ where: { email: email.trim().toLowerCase() } })
     if (userExists) {
-      console.log('User already exists:', email)
+      console.log('❌ User already exists:', email)
       return res.status(400).json({ 
         success: false,
         message: 'User already exists with this email' 
@@ -311,7 +311,6 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check password strength requirements
     const hasUpperCase = /[A-Z]/.test(password)
     const hasLowerCase = /[a-z]/.test(password)
     const hasNumbers = /\d/.test(password)
@@ -341,13 +340,16 @@ export const register = async (req, res) => {
     // Hash password
     const salt = await bcrypt.genSalt(10)
     const hashedPassword = await bcrypt.hash(password, salt)
-    console.log('Password hashed successfully')
+    console.log('✅ Password hashed successfully')
 
     // Generate verification token
     const verificationToken = generateVerificationToken()
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-    // Create user with hashed password
+    console.log('📧 Generated verification token:', verificationToken)
+    console.log('📧 Token expires at:', verificationExpires)
+
+    // Create user
     const user = await User.create({
       name: trimmedName,
       email: email.trim().toLowerCase(),
@@ -355,32 +357,31 @@ export const register = async (req, res) => {
       password: hashedPassword,
       role: 'volunteer',
       isVerified: false,
-      verificationToken,
-      verificationExpires
+      verificationToken: verificationToken,
+      verificationExpires: verificationExpires
     })
 
-    console.log('User created successfully:', user.id)
+    console.log('✅ User created successfully:', user.id)
+    console.log('📧 Verification token saved:', user.verificationToken ? 'Yes' : 'No')
+
+    // Verify the token was saved
+    const savedUser = await User.findByPk(user.id)
+    console.log('📧 Token verification check - Saved in DB:', savedUser.verificationToken ? 'Yes' : 'No')
 
     // Send verification email
     try {
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
+      console.log('📧 Verification URL:', verificationUrl)
+      
       await sendVerificationEmail(user.email, user.name, verificationToken)
       console.log('✅ Verification email sent successfully to:', user.email)
     } catch (emailError) {
       console.error('❌ Failed to send verification email:', emailError)
-      // If email fails, delete the user and return error
       await user.destroy()
-      
-      // Check if it's an email existence issue
-      const isEmailExistenceIssue = 
-        emailError.message?.includes('550') || 
-        emailError.message?.includes('does not exist') ||
-        emailError.message?.includes('Recipient address rejected')
       
       return res.status(500).json({
         success: false,
-        message: isEmailExistenceIssue 
-          ? 'This email address does not exist or cannot receive messages. Please check your email address.'
-          : 'Failed to send verification email. Please check your email address and try again.',
+        message: 'Failed to send verification email. Please check your email address and try again.',
         error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
       })
     }
@@ -393,12 +394,12 @@ export const register = async (req, res) => {
       notificationsEnabled: true
     })
 
-    console.log('Volunteer profile created successfully')
+    console.log('✅ Volunteer profile created successfully')
 
     // Generate token
     const token = generateToken(user.id)
 
-    // Return response without password
+    // Return response
     const userResponse = {
       id: user.id,
       name: user.name,
@@ -417,10 +418,10 @@ export const register = async (req, res) => {
       success: true,
       token,
       user: userResponse,
-      message: 'Registration successful! Please check your email to verify your account.'
+      message: 'Registration successful! Please check your email to verify your account before logging in.'
     })
   } catch (error) {
-    console.error('Register error details:', error)
+    console.error('❌ Register error details:', error)
     console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
@@ -441,7 +442,7 @@ export const login = async (req, res) => {
 
     // Validate input
     if (!email || !password) {
-      console.log('🔐 Missing credentials')
+      console.log('❌ Missing credentials')
       return res.status(400).json({ 
         success: false,
         message: 'Please provide email and password' 
@@ -449,7 +450,7 @@ export const login = async (req, res) => {
     }
 
     // Check if user exists
-    console.log('🔐 Searching for user:', email.trim().toLowerCase())
+    console.log('🔍 Searching for user:', email.trim().toLowerCase())
     const user = await User.findOne({ 
       where: { email: email.trim().toLowerCase() },
       include: [
@@ -459,58 +460,84 @@ export const login = async (req, res) => {
     })
 
     if (!user) {
-      console.log('🔐 User not found')
+      console.log('❌ User not found')
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
       })
     }
 
-    console.log('🔐 User found:', user.id)
-    console.log('🔐 User has password:', !!user.password)
+    console.log('✅ User found:', user.id)
+    console.log('📧 User verified status:', user.isVerified)
 
     // Check if user has a password
     if (!user.password) {
-      console.log('🔐 User has no password')
+      console.log('❌ User has no password')
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
       })
     }
 
-    // Check password using bcrypt.compare directly
+    // Check password
     console.log('🔐 Comparing passwords...')
-    
     const isPasswordValid = await bcrypt.compare(password, user.password)
     console.log('🔐 Password valid:', isPasswordValid)
     
     if (!isPasswordValid) {
-      console.log('🔐 Invalid password')
+      console.log('❌ Invalid password')
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
       })
     }
 
-    console.log('🔐 Password validated successfully')
+    // CHECK IF EMAIL IS VERIFIED
+    if (!user.isVerified) {
+      console.log('❌ User email not verified:', user.email)
+      return res.status(403).json({ 
+        success: false,
+        message: 'Please verify your email before logging in. Check your inbox for the verification link.',
+        needsVerification: true,
+        email: user.email
+      })
+    }
+
+    console.log('✅ Password validated successfully')
+    console.log('✅ User is verified')
 
     // Generate token
     const token = generateToken(user.id)
-    console.log('🔐 Token generated')
+    console.log('✅ Token generated')
 
-    // Prepare user response (exclude password)
+    // Prepare user response
     const userResponse = {
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
       role: user.role,
-      volunteer: user.volunteer,
-      organization: user.organization,
-      organizationId: user.organization?.id
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      volunteer: user.volunteer ? {
+        id: user.volunteer.id,
+        education: user.volunteer.education,
+        skills: user.volunteer.skills,
+        notificationsEnabled: user.volunteer.notificationsEnabled
+      } : null,
+      organization: user.organization ? {
+        id: user.organization.id,
+        name: user.organization.name,
+        description: user.organization.description,
+        contactDetails: user.organization.contactDetails,
+        logo: user.organization.logo,
+        isVerified: user.organization.isVerified
+      } : null,
+      organizationId: user.organization?.id || null
     }
 
-    console.log('🔐 Login successful for user:', user.id)
+    console.log('✅ Login successful for user:', user.id)
 
     res.json({
       success: true,
@@ -518,8 +545,8 @@ export const login = async (req, res) => {
       user: userResponse
     })
   } catch (error) {
-    console.error('🔐 Login error:', error)
-    console.error('🔐 Error stack:', error.stack)
+    console.error('❌ Login error:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Login failed. Please try again.',
@@ -555,6 +582,9 @@ export const getProfile = async (req, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       volunteer: user.volunteer,
       organization: user.organization,
       organizationId: user.organization?.id
@@ -639,8 +669,12 @@ export const updateProfile = async (req, res) => {
         email: updatedUser.email,
         phone: updatedUser.phone,
         role: updatedUser.role,
+        isVerified: updatedUser.isVerified,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
         volunteer: updatedUser.volunteer,
-        organization: updatedUser.organization
+        organization: updatedUser.organization,
+        organizationId: updatedUser.organization?.id
       }
     })
   } catch (error) {
@@ -689,7 +723,7 @@ export const verifyEmail = async (req, res) => {
 
     // Check if already verified
     if (user.isVerified) {
-      console.log('✅ User already verified:', user.email)
+      console.log('ℹ️ User already verified:', user.email)
       return res.json({
         success: true,
         message: 'Email already verified! You can login now.'
@@ -719,7 +753,7 @@ export const verifyEmail = async (req, res) => {
       await sendWelcomeEmail(user.email, user.name)
       console.log('✅ Welcome email sent to:', user.email)
     } catch (emailError) {
-      console.error('❌ Failed to send welcome email:', emailError)
+      console.error('⚠️ Failed to send welcome email:', emailError)
       // Continue even if welcome email fails
     }
 
@@ -804,7 +838,6 @@ export const completeProfile = async (req, res) => {
 
     const { phone, education } = req.body
 
-    // Validate required fields - only phone is required now
     if (!phone) {
       return res.status(400).json({ 
         success: false,
@@ -874,6 +907,9 @@ export const completeProfile = async (req, res) => {
         email: updatedUser.email,
         phone: updatedUser.phone,
         role: updatedUser.role,
+        isVerified: updatedUser.isVerified,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
         volunteer: updatedUser.volunteer,
         organization: updatedUser.organization,
         organizationId: updatedUser.organization?.id
