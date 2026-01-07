@@ -9,7 +9,7 @@ import { organizationService } from '../services/organizationService'
 const CreateOrganization = () => {
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const { updateUser } = useAuth()
+  const { updateUser, checkAuth } = useAuth() // Add checkAuth
   const [formData, setFormData] = useState({
     name: '',
     contactDetails: '',
@@ -25,8 +25,12 @@ const CreateOrganization = () => {
       }
       return response
     },
-    onSuccess: (data) => {
-      updateUser({ organizationId: data.id })
+    onSuccess: async (data) => {
+      console.log('✅ Organization created:', data)
+      
+      // IMPORTANT: Refresh user data from server to get organization info
+      await checkAuth()
+      
       toast.success('Organization created successfully!')
       navigate('/org-dashboard')
     },
