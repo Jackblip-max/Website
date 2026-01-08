@@ -311,3 +311,180 @@ export const sendApplicationAcceptance = async (volunteerEmail, opportunityTitle
   
   return await sendEmail({ to: volunteerEmail, subject, text })
 }
+
+export const sendOrganizationApprovalEmail = async (userEmail, userName, organizationName) => {
+  const subject = '✅ Organization Approved - MyanVolunteer'
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+        .success-icon { font-size: 48px; margin-bottom: 20px; }
+        .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+        .features { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .feature-item { padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+        .feature-item:last-child { border-bottom: none; }
+        .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="success-icon">🎉</div>
+          <h1>Congratulations! Your Organization is Approved!</h1>
+        </div>
+        <div class="content">
+          <h2>Hello ${userName}!</h2>
+          <p>Great news! Your organization <strong>${organizationName}</strong> has been verified and approved by our admin team.</p>
+          
+          <div class="features">
+            <h3>✨ What You Can Do Now:</h3>
+            <div class="feature-item">
+              ✅ <strong>Post Volunteer Opportunities</strong> - Share your volunteer needs with the community
+            </div>
+            <div class="feature-item">
+              ✅ <strong>Manage Applications</strong> - Review and accept volunteer applications
+            </div>
+            <div class="feature-item">
+              ✅ <strong>Build Your Team</strong> - Connect with passionate volunteers
+            </div>
+            <div class="feature-item">
+              ✅ <strong>Track Your Impact</strong> - Monitor your organization's volunteer engagement
+            </div>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.FRONTEND_URL}/org-dashboard" class="button">Go to Dashboard</a>
+          </div>
+          
+          <p style="margin-top: 20px;">Your organization profile is now visible to volunteers across Myanmar. Start posting opportunities and make a difference!</p>
+          
+          <p>If you have any questions or need assistance, feel free to contact our support team.</p>
+          
+          <p>Best regards,<br>The MyanVolunteer Team</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 MyanVolunteer. All rights reserved.</p>
+          <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  
+  const text = `
+    Congratulations ${userName}!
+    
+    Your organization "${organizationName}" has been verified and approved.
+    
+    You can now:
+    - Post volunteer opportunities
+    - Manage applications
+    - Build your volunteer team
+    - Track your impact
+    
+    Visit your dashboard: ${process.env.FRONTEND_URL}/org-dashboard
+    
+    Best regards,
+    The MyanVolunteer Team
+  `
+  
+  return await sendEmail({ to: userEmail, subject, text, html })
+}
+
+export const sendOrganizationRejectionEmail = async (userEmail, userName, organizationName, reason) => {
+  const subject = 'Organization Verification Update - MyanVolunteer'
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #fff7ed; padding: 30px; border-radius: 0 0 10px 10px; }
+        .reason-box { background: white; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+        .steps { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .step { padding: 10px 0; }
+        .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Organization Verification Update</h1>
+        </div>
+        <div class="content">
+          <h2>Hello ${userName},</h2>
+          <p>Thank you for submitting your organization <strong>${organizationName}</strong> for verification on MyanVolunteer.</p>
+          
+          <p>After careful review, our team has found that additional information or clarification is needed before we can approve your organization.</p>
+          
+          <div class="reason-box">
+            <h3>📋 Feedback from our team:</h3>
+            <p>${reason}</p>
+          </div>
+          
+          <div class="steps">
+            <h3>🔄 Next Steps:</h3>
+            <div class="step">
+              <strong>1.</strong> Review the feedback above carefully
+            </div>
+            <div class="step">
+              <strong>2.</strong> Update your organization information
+            </div>
+            <div class="step">
+              <strong>3.</strong> Contact us if you have questions: ${process.env.SMTP_USER}
+            </div>
+            <div class="step">
+              <strong>4.</strong> Resubmit when ready (you may need to create a new organization profile)
+            </div>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.FRONTEND_URL}/contact" class="button">Contact Support</a>
+          </div>
+          
+          <p style="margin-top: 20px;">We're here to help! If you have any questions about this decision or need clarification, please don't hesitate to reach out to our support team.</p>
+          
+          <p>Best regards,<br>The MyanVolunteer Admin Team</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 MyanVolunteer. All rights reserved.</p>
+          <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  
+  const text = `
+    Hello ${userName},
+    
+    Thank you for submitting "${organizationName}" for verification.
+    
+    After review, we need additional information before approval.
+    
+    Feedback: ${reason}
+    
+    Next Steps:
+    1. Review the feedback
+    2. Update your organization information
+    3. Contact us if needed: ${process.env.SMTP_USER}
+    4. Resubmit when ready
+    
+    We're here to help!
+    
+    Best regards,
+    The MyanVolunteer Admin Team
+  `
+  
+  return await sendEmail({ to: userEmail, subject, text, html })
+}
