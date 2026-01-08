@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Building2, Users, Heart, User, Check, XCircle } from 'lucide-react'
+import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, Phone, AlertCircle, Edit } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
 import { organizationService } from '../services/organizationService'
@@ -10,6 +10,12 @@ import Loader from '../components/common/Loader'
 const OrgDashboard = () => {
   const { t } = useLanguage()
   const queryClient = useQueryClient()
+
+  // Fetch organization details
+  const { data: organization, isLoading: orgLoading } = useQuery({
+    queryKey: ['myOrganization'],
+    queryFn: organizationService.getMyOrganization
+  })
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['orgStats'],
@@ -50,14 +56,98 @@ const OrgDashboard = () => {
     }
   })
 
-  if (statsLoading || oppsLoading) return <Loader />
+  if (statsLoading || oppsLoading || orgLoading) return <Loader />
+
+  // Extract organization data
+  const orgData = organization?.data || organization
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
+        {/* Organization Details Card */}
+        {orgData && (
+          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <div className="flex items-start justify-between mb-6">
+              <div className="flex items-start space-x-4">
+                {/* Logo */}
+                {orgData.logo ? (
+                  <img 
+                    src={orgData.logo} 
+                    alt={orgData.name}
+                    className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                    {orgData.name?.charAt(0) || 'O'}
+                  </div>
+                )}
+                
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-3xl font-bold text-gray-900">{orgData.name}</h2>
+                    {orgData.isVerified ? (
+                      <span className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                        <Check className="w-4 h-4" />
+                        Verified
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                        <AlertCircle className="w-4 h-4" />
+                        Pending Verification
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1">Description</h3>
+                    <p className="text-gray-600 leading-relaxed">{orgData.description}</p>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Mail className="w-4 h-4" />
+                      <span>{orgData.contactDetails}</span>
+                    </div>
+                  </div>
+
+                  {!orgData.isVerified && (
+                    <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <p className="text-sm text-orange-800">
+                        <AlertCircle className="w-4 h-4 inline mr-1" />
+                        Your organization is pending verification. Some features may be limited until verification is complete.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Link
+                to="/org/edit"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+              >
+                <Edit className="w-4 h-4" />
+                Edit Details
+              </Link>
+            </div>
+
+            {/* Member Since */}
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">Member Since:</span>{' '}
+                {orgData.createdAt ? new Date(orgData.createdAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                }) : 'N/A'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard Actions */}
         <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-gray-900">Organization Dashboard</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
             <Link
               to="/add-job"
               className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 font-medium flex items-center space-x-2"
@@ -150,7 +240,11 @@ const OrgDashboard = () => {
               ))}
             </div>
           ) : (
-            <p className="text-gray-600 text-center py-8">No applicants yet</p>
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg font-medium">No applicants yet</p>
+              <p className="text-gray-500 text-sm mt-2">Post some volunteer opportunities to start receiving applications</p>
+            </div>
           )}
         </div>
       </div>
