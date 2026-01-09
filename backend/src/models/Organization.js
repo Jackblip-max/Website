@@ -36,10 +36,34 @@ const Organization = sequelize.define('Organization', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   }
-}, {
-  tableName: 'organizations',
-  timestamps: true
-})
+  verificationStatus: {
+  type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+  defaultValue: 'pending'
+  },
+  verificationReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  verifiedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  verifiedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  documents: {
+    type: DataTypes.JSON,
+    allowNull: true
+  }
+  }, {
+    tableName: 'organizations',
+    timestamps: true
+  })
 
 export { Organization }
 export default Organization
