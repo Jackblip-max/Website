@@ -5,6 +5,7 @@ import Opportunity from './Opportunity.js'
 import Application from './Application.js'
 import SavedOpportunity from './SavedOpportunity.js'
 import Notification from './Notification.js'
+import AdminLog from './AdminLog.js'
 
 // User - Volunteer (One-to-One)
 User.hasOne(Volunteer, { foreignKey: 'userId', as: 'volunteer' })
@@ -34,6 +35,10 @@ Opportunity.belongsToMany(Volunteer, { through: SavedOpportunity, foreignKey: 'o
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' })
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' })
 
+// Add AdminLog relationships
+User.hasMany(AdminLog, { foreignKey: 'adminId', as: 'adminLogs' })
+AdminLog.belongsTo(User, { foreignKey: 'adminId', as: 'admin' })
+
 export {
   User,
   Volunteer,
@@ -41,5 +46,6 @@ export {
   Opportunity,
   Application,
   SavedOpportunity,
-  Notification
+  Notification,
+  AdminLog
 }
