@@ -8,6 +8,14 @@ import { LanguageProvider } from './context/LanguageContext'
 import CompleteProfile from './pages/CompleteProfile'
 import VerifyEmail from './pages/VerifyEmail'
 import MainLayout from './layouts/MainLayout'
+
+// ⭐ NEW PAGES
+import Landing from './pages/Landing'
+import UserPortal from './pages/UserPortal'
+import AdminLogin from './pages/AdminLogin'
+import AdminDashboard from './pages/AdminDashboard'
+
+// Existing pages
 import Home from './pages/Home'
 import About from './pages/About'
 import Categories from './pages/Categories'
@@ -42,7 +50,14 @@ function App() {
           <Router>
             <MainLayout>
               <Routes>
-                <Route path="/" element={<Home />} />
+                {/* ⭐ NEW: Landing and portals */}
+                <Route path="/" element={<Landing />} />
+                <Route path="/user-portal" element={<UserPortal />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+                
+                {/* User routes - moved to /browse */}
+                <Route path="/browse" element={<Home />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
@@ -56,9 +71,10 @@ function App() {
                 <Route path="/add-job" element={<AddJob />} />
                 <Route path="/saved" element={<SavedOpportunities />} />
                 <Route path="/applications" element={<Applications />} />
-                <Route path="*" element={<NotFound />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/complete-profile" element={<CompleteProfile />} />
+                
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </MainLayout>
           </Router>
