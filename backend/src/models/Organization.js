@@ -35,10 +35,10 @@ const Organization = sequelize.define('Organization', {
   isVerified: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
-  }
+  },  // ⭐ Added missing comma here
   verificationStatus: {
-  type: DataTypes.ENUM('pending', 'approved', 'rejected'),
-  defaultValue: 'pending'
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending'
   },
   verificationReason: {
     type: DataTypes.TEXT,
@@ -60,10 +60,10 @@ const Organization = sequelize.define('Organization', {
     type: DataTypes.JSON,
     allowNull: true
   }
-  }, {
-    tableName: 'organizations',
-    timestamps: true
-  })
+}, {
+  tableName: 'organizations',
+  timestamps: true
+})
 
 export { Organization }
 export default Organization
