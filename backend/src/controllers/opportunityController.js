@@ -86,6 +86,14 @@ export const createOpportunity = async (req, res) => {
       return res.status(403).json({ message: 'Only organizations can create opportunities' })
     }
 
+    // ⭐ NEW: Check if organization is approved
+    if (organization.verificationStatus !== 'approved') {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Your organization must be verified and approved before posting opportunities. Please wait for admin approval.' 
+      })
+    }
+
     const opportunity = await Opportunity.create({
       organizationId: organization.id,
       title,
