@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff, Mail } from 'lucide-react'
+import { Eye, EyeOff, Mail, ArrowLeft } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import DynamicBackground from '../components/common/DynamicBackground'
@@ -33,25 +33,22 @@ const Login = () => {
     onSuccess: async (response) => {
       console.log('✅ Login successful - Response:', response)
       console.log('✅ User data:', response?.user)
-      console.log('✅ Token:', response?.token ? 'Token received' : 'No token')
       
       toast.success('Login successful!')
       
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      navigate('/')
+      // Redirect based on role - admins should not reach here (they use /admin/login)
+      navigate('/browse')
     },
     onError: (error) => {
       console.error('❌ Login error FULL:', error)
-      console.error('❌ Error response:', error.response)
-      console.error('❌ Error response data:', error.response?.data)
       
       const errorData = error.response?.data
       const message = errorData?.message || error.message || 'Login failed'
       
       // Check if it's a verification error
       if (errorData?.needsVerification || error.response?.status === 403) {
-        // Show a more helpful toast with option to resend verification
         toast((toastInstance) => (
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-2">
@@ -109,7 +106,6 @@ const Login = () => {
     e.stopPropagation()
     
     console.log('📝 Form submitted')
-    console.log('📝 Form data:', { email: formData.email, password: '***' })
     
     if (!formData.email || !formData.password) {
       console.log('⚠️ Validation failed: Missing fields')
@@ -142,6 +138,15 @@ const Login = () => {
   return (
     <DynamicBackground category="minimal" overlay={0.8}>
       <div className="min-h-screen flex items-center justify-center py-12 px-4">
+        {/* Back Button */}
+        <Link 
+          to="/user-portal"
+          className="absolute top-8 left-8 inline-flex items-center text-white hover:text-emerald-200 transition-colors z-10"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back
+        </Link>
+
         <div className="max-w-md w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 transform hover:scale-[1.02] transition-all">
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 shadow-xl transform hover:rotate-12 transition-transform">
