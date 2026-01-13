@@ -8,6 +8,7 @@ import { volunteerService } from '../services/volunteerService'
 import OpportunityCard from '../components/volunteer/OpportunityCard'
 import Loader from '../components/common/Loader'
 import DynamicBackground from '../components/common/DynamicBackground'
+import { Link, useNavigate } from 'react-router-dom'
 
 const Home = () => {
   const { t } = useLanguage()
