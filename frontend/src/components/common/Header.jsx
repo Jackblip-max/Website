@@ -1,15 +1,23 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Menu, X, Globe, User, ChevronDown, Bell, Bookmark, Clock, Building2, LogOut } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
 const Header = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, isAuthenticated, logout } = useAuth()
   const { currentLanguage, toggleLanguage, t } = useLanguage()
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  // Hide header on landing, portals, and admin pages
+  const hideHeader = ['/', '/user-portal', '/admin/login', '/admin'].includes(location.pathname)
+  
+  if (hideHeader) {
+    return null
+  }
 
   const handleLogout = () => {
     logout()
@@ -23,7 +31,7 @@ const Header = () => {
         <div className="flex items-center h-16">
           {/* Left: Logo */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-3">
+            <Link to="/browse" className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
                 MV
               </div>
@@ -36,7 +44,7 @@ const Header = () => {
 
           {/* Center: Navigation - Takes full space */}
           <nav className="hidden md:flex flex-1 justify-center space-x-12">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('home')}</Link>
+            <Link to="/browse" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('home')}</Link>
             <Link to="/about" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('about')}</Link>
             <Link to="/categories" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('categories')}</Link>
             <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('howItWorks')}</Link>
@@ -152,7 +160,7 @@ const Header = () => {
         <div className="md:hidden border-t border-gray-200 bg-white">
           <nav className="px-4 py-4 space-y-2">
             <Link 
-              to="/" 
+              to="/browse" 
               className="block py-2 text-gray-700 hover:text-blue-600"
               onClick={() => setMenuOpen(false)}
             >
