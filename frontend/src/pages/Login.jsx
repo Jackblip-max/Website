@@ -38,7 +38,7 @@ const Login = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Redirect based on role - admins should not reach here (they use /admin/login)
+      // Redirect to browse page
       navigate('/browse')
     },
     onError: (error) => {
@@ -140,11 +140,11 @@ const Login = () => {
       <div className="min-h-screen flex items-center justify-center py-12 px-4">
         {/* Back Button */}
         <Link 
-          to="/user-portal"
+          to="/"
           className="absolute top-8 left-8 inline-flex items-center text-white hover:text-emerald-200 transition-colors z-10"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
+          Back to Home
         </Link>
 
         <div className="max-w-md w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 transform hover:scale-[1.02] transition-all">
