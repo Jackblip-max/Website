@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Menu, X, Globe, User, ChevronDown, Bell, Bookmark, Clock, Building2, LogOut } from 'lucide-react'
+import { Menu, X, Globe, User, ChevronDown, Bookmark, Clock, Building2, LogOut } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
@@ -12,8 +12,8 @@ const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
-  // Hide header on landing, portals, and admin pages
-  const hideHeader = ['/', '/user-portal', '/admin/login', '/admin'].includes(location.pathname)
+  // Hide header on landing, admin pages, and auth pages
+  const hideHeader = ['/', '/admin/login', '/admin'].includes(location.pathname)
   
   if (hideHeader) {
     return null
