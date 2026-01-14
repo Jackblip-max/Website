@@ -10,7 +10,6 @@ import MainLayout from './layouts/MainLayout'
 
 // Landing & Portal Pages
 import Landing from './pages/Landing'
-import UserPortal from './pages/UserPortal'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 
@@ -80,9 +79,8 @@ function App() {
           <Router>
             <MainLayout>
               <Routes>
-                {/* Landing & Portal Routes */}
+                {/* Landing Page */}
                 <Route path="/" element={<Landing />} />
-                <Route path="/user-portal" element={<UserPortal />} />
                 
                 {/* Admin Routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />
