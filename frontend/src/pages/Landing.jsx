@@ -25,9 +25,9 @@ const Landing = () => {
 
           {/* Two Paths */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* User Path */}
+            {/* User Path - Direct to Register */}
             <Link 
-              to="/user-portal"
+              to="/register"
               className="group relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden transform hover:scale-105 transition-all duration-300 hover:shadow-emerald-500/50"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -113,7 +113,7 @@ const Landing = () => {
           {/* Footer Note */}
           <div className="text-center mt-12">
             <p className="text-white/80 text-sm">
-              New to MyanVolunteer? Choose "I'm a User" to get started!
+              New to MyanVolunteer? Click "I'm a User" to create your account!
             </p>
           </div>
         </div>
