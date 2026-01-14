@@ -2,11 +2,10 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff, CheckCircle, XCircle, Loader as LoaderIcon } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, XCircle, Loader as LoaderIcon, ArrowLeft } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import DynamicBackground from '../components/common/DynamicBackground'
-import { ArrowLeft } from 'lucide-react'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -249,13 +248,15 @@ const Register = () => {
   return (
     <DynamicBackground category="minimal" overlay={0.85}>
       <div className="min-h-screen py-12 px-4">
-                <Link 
-          to="/user-portal"
+        {/* Back Button */}
+        <Link 
+          to="/"
           className="inline-flex items-center text-white hover:text-emerald-200 mb-8 transition-colors ml-8 mt-8"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back
+          Back to Home
         </Link>
+
         <div className="max-w-2xl mx-auto bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 shadow-xl">
@@ -454,7 +455,7 @@ const Register = () => {
             >
               {registerMutation.isPending ? (
                 <span className="flex items-center justify-center">
-                  <LoaderIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                  <LoaderIcon className="animate-spin -ml-1 mr-3 h- 5 w-5 text-white" />
                   Creating account...
                 </span>
               ) : t('submit')}
