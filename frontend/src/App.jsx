@@ -9,7 +9,6 @@ import { LanguageProvider } from './context/LanguageContext'
 import MainLayout from './layouts/MainLayout'
 
 // Landing & Portal Pages
-import Landing from './pages/Landing'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 
@@ -79,8 +78,8 @@ function App() {
           <Router>
             <MainLayout>
               <Routes>
-                {/* Landing Page */}
-                <Route path="/" element={<Landing />} />
+                {/* Home is now the main landing page */}
+                <Route path="/" element={<Home />} />
                 
                 {/* Admin Routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />
