@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Menu, X, Globe, User, ChevronDown, Bookmark, Clock, Building2, LogOut } from 'lucide-react'
+import { Menu, X, Globe, User, ChevronDown, Bookmark, Clock, Building2, LogOut, Shield, Users as UsersIcon } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
@@ -11,9 +11,10 @@ const Header = () => {
   const { currentLanguage, toggleLanguage, t } = useLanguage()
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
-  // Hide header on landing, admin pages, and auth pages
-  const hideHeader = ['/', '/admin/login', '/admin'].includes(location.pathname)
+  // Hide header on admin pages and auth pages (but NOT home page anymore)
+  const hideHeader = ['/admin/login', '/admin'].includes(location.pathname)
   
   if (hideHeader) {
     return null
@@ -25,172 +26,238 @@ const Header = () => {
     navigate('/')
   }
 
+  const handleLoginClick = () => {
+    setLoginModalOpen(true)
+  }
+
+  const handleUserLogin = () => {
+    setLoginModalOpen(false)
+    navigate('/login')
+  }
+
+  const handleAdminLogin = () => {
+    setLoginModalOpen(false)
+    navigate('/admin/login')
+  }
+
   return (
-    <header className="bg-white shadow-md sticky top-0 z-50">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16">
-          {/* Left: Logo */}
-          <div className="flex items-center">
-            <Link to="/browse" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                MV
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-gray-900">MyanVolunteer</h1>
-                <p className="text-xs text-gray-600">{t('tagline')}</p>
-              </div>
-            </Link>
-          </div>
+    <>
+      <header className="bg-white shadow-md sticky top-0 z-50">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16">
+            {/* Left: Logo */}
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                  MV
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-xl font-bold text-gray-900">MyanVolunteer</h1>
+                  <p className="text-xs text-gray-600">{t('tagline')}</p>
+                </div>
+              </Link>
+            </div>
 
-          {/* Center: Navigation - Takes full space */}
-          <nav className="hidden md:flex flex-1 justify-center space-x-12">
-            <Link to="/browse" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('home')}</Link>
-            <Link to="/about" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('about')}</Link>
-            <Link to="/categories" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('categories')}</Link>
-            <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium text-lg">{t('howItWorks')}</Link>
-          </nav>
+            {/* Center: Navigation - Takes full space */}
+            <nav className="hidden md:flex flex-1 justify-center space-x-12">
+              <Link to="/" className="text-gray-700 hover:text-emerald-600 font-medium text-lg">{t('home')}</Link>
+              <Link to="/about" className="text-gray-700 hover:text-emerald-600 font-medium text-lg">{t('about')}</Link>
+              <Link to="/categories" className="text-gray-700 hover:text-emerald-600 font-medium text-lg">{t('categories')}</Link>
+              <Link to="/how-it-works" className="text-gray-700 hover:text-emerald-600 font-medium text-lg">{t('howItWorks')}</Link>
+            </nav>
 
-          {/* Right: Actions */}
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center space-x-1 text-gray-700 hover:text-blue-600"
-            >
-              <Globe className="w-5 h-5" />
-              <span className="text-sm font-medium">{currentLanguage === 'en' ? 'MY' : 'EN'}</span>
-            </button>
+            {/* Right: Actions */}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center space-x-1 text-gray-700 hover:text-emerald-600"
+              >
+                <Globe className="w-5 h-5" />
+                <span className="text-sm font-medium">{currentLanguage === 'en' ? 'MY' : 'EN'}</span>
+              </button>
 
-            {!isAuthenticated ? (
-              <div className="flex items-center space-x-2">
-                <Link
-                  to="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium px-4 py-2"
-                >
-                  {t('login')}
-                </Link>
-                <Link
-                  to="/register"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-                >
-                  {t('register')}
-                </Link>
-              </div>
-            ) : (
-              <div className="relative">
-                <button
-                  onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600"
-                >
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <span className="hidden md:block font-medium">{user?.name}</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-
-                {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-                    <div className="px-4 py-2 border-b border-gray-200">
-                      <p className="font-semibold text-gray-900">{user?.name}</p>
-                      <p className="text-sm text-gray-600">{user?.email}</p>
+              {!isAuthenticated ? (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleLoginClick}
+                    className="text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-medium px-6 py-2 rounded-lg transition-all"
+                  >
+                    {t('login')}
+                  </button>
+                  <Link
+                    to="/register"
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                  >
+                    {t('register')}
+                  </Link>
+                </div>
+              ) : (
+                <div className="relative">
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-emerald-600"
+                  >
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <User className="w-5 h-5 text-emerald-600" />
                     </div>
-                    
-                    <Link 
-                      to="/profile" 
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      <span>{t('myProfile')}</span>
-                    </Link>
+                    <span className="hidden md:block font-medium">{user?.name}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
 
-                    {/* ONLY show "My Organization" if user HAS an organization */}
-                    {user?.organization && (
+                  {profileOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <p className="font-semibold text-gray-900">{user?.name}</p>
+                        <p className="text-sm text-gray-600">{user?.email}</p>
+                      </div>
+                      
                       <Link 
-                        to="/org-dashboard" 
+                        to="/profile" 
                         className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
                         onClick={() => setProfileOpen(false)}
                       >
-                        <Building2 className="w-4 h-4" />
-                        <span>{t('myOrganization')}</span>
+                        <User className="w-4 h-4" />
+                        <span>{t('myProfile')}</span>
                       </Link>
-                    )}
 
-                    <Link 
-                      to="/saved" 
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <Bookmark className="w-4 h-4" />
-                      <span>{t('savedTasks')}</span>
-                    </Link>
+                      {user?.organization && (
+                        <Link 
+                          to="/org-dashboard" 
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
+                          onClick={() => setProfileOpen(false)}
+                        >
+                          <Building2 className="w-4 h-4" />
+                          <span>{t('myOrganization')}</span>
+                        </Link>
+                      )}
 
-                    <Link 
-                      to="/applications" 
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
-                      onClick={() => setProfileOpen(false)}
-                    >
-                      <Clock className="w-4 h-4" />
-                      <span>{t('applications')}</span>
-                    </Link>
+                      <Link 
+                        to="/saved" 
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Bookmark className="w-4 h-4" />
+                        <span>{t('savedTasks')}</span>
+                      </Link>
 
-                    <button 
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-red-600"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>{t('logout')}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                      <Link 
+                        to="/applications" 
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-gray-700"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Clock className="w-4 h-4" />
+                        <span>{t('applications')}</span>
+                      </Link>
 
-            <button 
-              onClick={() => setMenuOpen(!menuOpen)} 
-              className="md:hidden text-gray-700"
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 text-red-600"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>{t('logout')}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button 
+                onClick={() => setMenuOpen(!menuOpen)} 
+                className="md:hidden text-gray-700"
+              >
+                {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {menuOpen && (
+          <div className="md:hidden border-t border-gray-200 bg-white">
+            <nav className="px-4 py-4 space-y-2">
+              <Link 
+                to="/" 
+                className="block py-2 text-gray-700 hover:text-emerald-600"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t('home')}
+              </Link>
+              <Link 
+                to="/about" 
+                className="block py-2 text-gray-700 hover:text-emerald-600"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t('about')}
+              </Link>
+              <Link 
+                to="/categories" 
+                className="block py-2 text-gray-700 hover:text-emerald-600"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t('categories')}
+              </Link>
+              <Link 
+                to="/how-it-works" 
+                className="block py-2 text-gray-700 hover:text-emerald-600"
+                onClick={() => setMenuOpen(false)}
+              >
+                {t('howItWorks')}
+              </Link>
+            </nav>
+          </div>
+        )}
+      </header>
+
+      {/* Login Selection Modal */}
+      {loginModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setLoginModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Choose Login Type</h2>
+              <p className="text-gray-600">Select how you want to login</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* User Login */}
+              <button
+                onClick={handleUserLogin}
+                className="group relative bg-gradient-to-br from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl p-8 border-2 border-emerald-200 hover:border-emerald-400 transition-all"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                  <UsersIcon className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">User Login</h3>
+                <p className="text-gray-600 mb-4">For volunteers and organizations</p>
+                <div className="text-emerald-600 font-semibold group-hover:text-emerald-700">
+                  Continue as User →
+                </div>
+              </button>
+
+              {/* Admin Login */}
+              <button
+                onClick={handleAdminLogin}
+                className="group relative bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-xl p-8 border-2 border-blue-200 hover:border-blue-400 transition-all"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                  <Shield className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Admin Login</h3>
+                <p className="text-gray-600 mb-4">For platform administrators</p>
+                <div className="text-blue-600 font-semibold group-hover:text-blue-700">
+                  Continue as Admin →
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setLoginModalOpen(false)}
+              className="mt-6 w-full text-gray-600 hover:text-gray-800 font-medium"
             >
-              {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              Cancel
             </button>
           </div>
         </div>
-      </div>
-
-      {menuOpen && (
-        <div className="md:hidden border-t border-gray-200 bg-white">
-          <nav className="px-4 py-4 space-y-2">
-            <Link 
-              to="/browse" 
-              className="block py-2 text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              {t('home')}
-            </Link>
-            <Link 
-              to="/about" 
-              className="block py-2 text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              {t('about')}
-            </Link>
-            <Link 
-              to="/categories" 
-              className="block py-2 text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              {t('categories')}
-            </Link>
-            <Link 
-              to="/how-it-works" 
-              className="block py-2 text-gray-700 hover:text-blue-600"
-              onClick={() => setMenuOpen(false)}
-            >
-              {t('howItWorks')}
-            </Link>
-          </nav>
-        </div>
       )}
-    </header>
+    </>
   )
 }
 
