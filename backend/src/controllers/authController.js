@@ -1,3 +1,4 @@
+// backend/src/controllers/authController.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
@@ -211,7 +212,16 @@ export const register = async (req, res) => {
   try {
     console.log('📝 Registration request received:', { ...req.body, password: '***' })
     
-    const { name, email, phone, password, education } = req.body
+    const { 
+      name, 
+      email, 
+      phone, 
+      password, 
+      education,
+      skills,
+      preferredCategories,  // NEW: User preferences
+      preferredModes        // NEW: User preferences
+    } = req.body
 
     if (!name || !email || !phone || !password) {
       console.log('❌ Missing required fields')
@@ -365,14 +375,21 @@ export const register = async (req, res) => {
       })
     }
 
+    // ⭐ NEW: Create volunteer profile with preferences
     await Volunteer.create({
       userId: user.id,
       education: education || 'undergraduate',
-      skills: '',
+      skills: skills || '',
+      preferredCategories: preferredCategories || [],  // NEW: Save preferences
+      preferredModes: preferredModes || [],            // NEW: Save preferences
       notificationsEnabled: true
     })
 
-    console.log('✅ Volunteer profile created successfully')
+    console.log('✅ Volunteer profile created successfully with preferences')
+    console.log('📊 Preferences saved:', {
+      categories: preferredCategories || [],
+      modes: preferredModes || []
+    })
 
     const token = generateToken(user.id)
 
@@ -385,7 +402,9 @@ export const register = async (req, res) => {
       isVerified: user.isVerified,
       volunteer: {
         education: education || 'undergraduate',
-        skills: '',
+        skills: skills || '',
+        preferredCategories: preferredCategories || [],  // NEW: Include in response
+        preferredModes: preferredModes || [],            // NEW: Include in response
         notificationsEnabled: true
       }
     }
@@ -494,6 +513,8 @@ export const login = async (req, res) => {
         id: user.volunteer.id,
         education: user.volunteer.education,
         skills: user.volunteer.skills,
+        preferredCategories: user.volunteer.preferredCategories || [],  // NEW: Include preferences
+        preferredModes: user.volunteer.preferredModes || [],            // NEW: Include preferences
         notificationsEnabled: user.volunteer.notificationsEnabled
       } : null,
       organization: user.organization ? {
@@ -549,10 +570,6 @@ export const getProfile = async (req, res) => {
 
     console.log('✅ User found:', user.email)
     console.log('📊 Has organization:', !!user.organization)
-    if (user.organization) {
-      console.log('🏢 Organization ID:', user.organization.id)
-      console.log('🏢 Organization Name:', user.organization.name)
-    }
 
     res.json({
       success: true,
@@ -568,6 +585,8 @@ export const getProfile = async (req, res) => {
         id: user.volunteer.id,
         education: user.volunteer.education,
         skills: user.volunteer.skills,
+        preferredCategories: user.volunteer.preferredCategories || [],  // NEW
+        preferredModes: user.volunteer.preferredModes || [],            // NEW
         notificationsEnabled: user.volunteer.notificationsEnabled
       } : null,
       organization: user.organization ? {
@@ -595,7 +614,15 @@ export const getProfile = async (req, res) => {
 // @access  Private
 export const updateProfile = async (req, res) => {
   try {
-    const { name, phone, education, skills, notificationsEnabled } = req.body
+    const { 
+      name, 
+      phone, 
+      education, 
+      skills, 
+      notificationsEnabled,
+      preferredCategories,  // NEW: Allow updating preferences
+      preferredModes        // NEW: Allow updating preferences
+    } = req.body
 
     const user = await User.findByPk(req.user.id)
     if (!user) {
@@ -632,11 +659,21 @@ export const updateProfile = async (req, res) => {
     if (user.role === 'volunteer') {
       const volunteer = await Volunteer.findOne({ where: { userId: user.id } })
       if (volunteer) {
-        await volunteer.update({
+        const updateData = {
           education: education || volunteer.education,
           skills: skills !== undefined ? skills : volunteer.skills,
           notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : volunteer.notificationsEnabled
-        })
+        }
+
+        // NEW: Update preferences if provided
+        if (preferredCategories !== undefined) {
+          updateData.preferredCategories = preferredCategories
+        }
+        if (preferredModes !== undefined) {
+          updateData.preferredModes = preferredModes
+        }
+
+        await volunteer.update(updateData)
       }
     }
 
@@ -853,6 +890,8 @@ export const completeProfile = async (req, res) => {
         userId: user.id,
         education: education || 'undergraduate',
         skills: '',
+        preferredCategories: [],  // NEW: Initialize empty preferences
+        preferredModes: [],        // NEW: Initialize empty preferences
         notificationsEnabled: true
       })
     } else {
