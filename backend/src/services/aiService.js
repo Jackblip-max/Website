@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const OLLAMA_API = 'http://localhost:11434/api/generate'
+const OLLAMA_TAGS_API = 'http://localhost:11434/api/tags'
 
 /**
  * Generate opportunity description using Ollama (Local LLM)
@@ -31,27 +32,35 @@ Write ONLY the description, no extra commentary.`
 
   try {
     console.log('🤖 Generating description with Ollama...')
+    console.log('📝 Title:', title)
+    console.log('📍 Location:', location)
     
     const response = await axios.post(OLLAMA_API, {
-      model: 'llama3.2', // Using Llama 3.2 (faster, smaller model)
+      model: 'llama3.2',
       prompt: prompt,
       stream: false,
       options: {
-        temperature: 0.7, // Creative but consistent
+        temperature: 0.7,
         top_p: 0.9,
-        max_tokens: 300
+        num_predict: 300
       }
     }, {
-      timeout: 30000 // 30 second timeout
+      timeout: 60000 // 60 second timeout for generation
     })
 
     const generatedText = response.data.response.trim()
     
     console.log('✅ Description generated successfully')
+    console.log('📊 Length:', generatedText.length, 'characters')
+    
     return generatedText
 
   } catch (error) {
     console.error('❌ Ollama generation error:', error.message)
+    
+    if (error.code === 'ECONNREFUSED') {
+      console.error('⚠️  Ollama is not running. Please start it with: ollama serve')
+    }
     
     // Fallback to template-based generation
     console.log('⚠️  Falling back to template-based generation')
@@ -96,27 +105,44 @@ export const generateDescriptionVariations = async (opportunityData) => {
   ]
 
   try {
+    console.log('🎨 Generating description variations...')
+    
     const variations = await Promise.all(
       tones.map(async (tone) => {
-        const prompt = `Write a ${tone.name} tone volunteer opportunity description for: ${opportunityData.title}`
+        const prompt = `Write a ${tone.name} tone volunteer opportunity description for: ${opportunityData.title}. Category: ${opportunityData.category}. Location: ${opportunityData.location}. Keep it 150-200 words.`
         
-        const response = await axios.post(OLLAMA_API, {
-          model: 'llama3.2',
-          prompt: prompt,
-          stream: false,
-          options: { temperature: tone.temp }
-        })
+        try {
+          const response = await axios.post(OLLAMA_API, {
+            model: 'llama3.2',
+            prompt: prompt,
+            stream: false,
+            options: { 
+              temperature: tone.temp,
+              num_predict: 250
+            }
+          }, {
+            timeout: 60000
+          })
 
-        return {
-          tone: tone.name,
-          description: response.data.response.trim()
+          return {
+            tone: tone.name,
+            description: response.data.response.trim()
+          }
+        } catch (err) {
+          console.error(`❌ Failed to generate ${tone.name} variation:`, err.message)
+          return {
+            tone: tone.name,
+            description: generateTemplateDescription(opportunityData)
+          }
         }
       })
     )
 
+    console.log('✅ Generated', variations.length, 'variations')
     return variations
+    
   } catch (error) {
-    console.error('Error generating variations:', error)
+    console.error('❌ Error generating variations:', error.message)
     return [{
       tone: 'professional',
       description: generateTemplateDescription(opportunityData)
@@ -135,18 +161,28 @@ ${currentDescription}
 
 Feedback: ${feedback}
 
-Write an improved version that addresses the feedback while maintaining professionalism and engagement.`
+Write an improved version that addresses the feedback while maintaining professionalism and engagement. Keep it 150-200 words.`
 
   try {
+    console.log('✨ Improving description...')
+    
     const response = await axios.post(OLLAMA_API, {
       model: 'llama3.2',
       prompt: prompt,
-      stream: false
+      stream: false,
+      options: {
+        temperature: 0.7,
+        num_predict: 300
+      }
+    }, {
+      timeout: 60000
     })
 
+    console.log('✅ Description improved')
     return response.data.response.trim()
+    
   } catch (error) {
-    console.error('Error improving description:', error)
+    console.error('❌ Error improving description:', error.message)
     return currentDescription
   }
 }
@@ -156,22 +192,53 @@ Write an improved version that addresses the feedback while maintaining professi
  */
 export const checkOllamaStatus = async () => {
   try {
-    const response = await axios.get('http://localhost:11434/api/tags', {
-      timeout: 5000
+    console.log('🔍 Checking Ollama status at:', OLLAMA_TAGS_API)
+    
+    const response = await axios.get(OLLAMA_TAGS_API, {
+      timeout: 5000,
+      validateStatus: (status) => status === 200
     })
     
+    console.log('✅ Ollama is running!')
+    
     const models = response.data.models || []
-    const hasLlama = models.some(m => m.name.includes('llama'))
+    console.log('📊 Available models:', models.length)
+    
+    if (models.length > 0) {
+      console.log('🤖 Models found:')
+      models.forEach(model => {
+        console.log(`   - ${model.name} (${(model.size / 1e9).toFixed(2)} GB)`)
+      })
+    }
+    
+    const hasLlama = models.some(m => m.name && m.name.toLowerCase().includes('llama'))
+    console.log('✓ Has Llama model:', hasLlama)
     
     return {
       available: true,
       models: models.map(m => m.name),
-      hasLlama
+      hasLlama,
+      modelCount: models.length
     }
+    
   } catch (error) {
+    console.error('❌ Ollama status check failed')
+    
+    if (error.code === 'ECONNREFUSED') {
+      console.error('   → Ollama is not running')
+      console.error('   → Start it with: ollama serve')
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('   → Connection timed out')
+      console.error('   → Ollama might be starting up, try again')
+    } else {
+      console.error('   → Error:', error.message)
+    }
+    
     return {
       available: false,
-      error: 'Ollama is not running. Please start Ollama service.'
+      error: 'Ollama is not running. Please start Ollama service.',
+      errorCode: error.code,
+      errorMessage: error.message
     }
   }
 }
