@@ -7,12 +7,23 @@ const router = express.Router()
 // Get saved opportunities
 router.get('/', authenticate, async (req, res) => {
   try {
+    console.log('📚 Fetching saved opportunities for user:', req.user.id)
+    
+    // Find volunteer profile
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    
     if (!volunteer) {
-      return res.status(403).json({ message: 'Volunteer profile not found' })
+      console.log('❌ Volunteer profile not found for user:', req.user.id)
+      return res.status(403).json({ 
+        success: false,
+        message: 'Volunteer profile not found. Only volunteers can save opportunities.' 
+      })
     }
 
-    const saved = await SavedOpportunity.findAll({
+    console.log('✅ Found volunteer:', volunteer.id)
+
+    // Fetch saved opportunities with full details
+    const savedOpportunities = await SavedOpportunity.findAll({
       where: { volunteerId: volunteer.id },
       include: [{
         model: Opportunity,
@@ -20,18 +31,50 @@ router.get('/', authenticate, async (req, res) => {
         include: [{
           model: Organization,
           as: 'organization',
-          attributes: ['name', 'logo']
-        }]
-      }]
+          attributes: ['id', 'name', 'logo', 'description']
+        }],
+        attributes: ['id', 'title', 'description', 'category', 'location', 'mode', 'timeCommitment', 'requirements', 'benefits', 'deadline', 'status', 'createdAt']
+      }],
+      order: [['createdAt', 'DESC']]
+    })
+
+    console.log('✅ Found', savedOpportunities.length, 'saved opportunities')
+
+    // Transform data to include organization details at the top level
+    const formattedData = savedOpportunities.map(saved => {
+      const opp = saved.opportunity
+      return {
+        id: opp.id,
+        title: opp.title,
+        description: opp.description,
+        category: opp.category,
+        location: opp.location,
+        mode: opp.mode,
+        timeCommitment: opp.timeCommitment,
+        requirements: opp.requirements,
+        benefits: opp.benefits,
+        deadline: opp.deadline,
+        status: opp.status,
+        organizationName: opp.organization?.name || 'Unknown Organization',
+        organizationLogo: opp.organization?.logo || null,
+        organizationId: opp.organization?.id || null,
+        savedAt: saved.createdAt,
+        isSaved: true
+      }
     })
 
     res.json({
       success: true,
-      data: saved.map(s => s.opportunity)
+      data: formattedData,
+      count: formattedData.length
     })
   } catch (error) {
-    console.error('Get saved error:', error)
-    res.status(500).json({ message: 'Failed to get saved opportunities', error: error.message })
+    console.error('❌ Get saved opportunities error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to get saved opportunities', 
+      error: error.message 
+    })
   }
 })
 
@@ -40,32 +83,71 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const { opportunityId } = req.body
 
+    if (!opportunityId) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Opportunity ID is required' 
+      })
+    }
+
+    console.log('💾 Saving opportunity:', opportunityId, 'for user:', req.user.id)
+
+    // Find volunteer profile
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    
     if (!volunteer) {
-      return res.status(403).json({ message: 'Volunteer profile not found' })
+      console.log('❌ Volunteer profile not found')
+      return res.status(403).json({ 
+        success: false,
+        message: 'Volunteer profile not found. Only volunteers can save opportunities.' 
+      })
+    }
+
+    // Check if opportunity exists
+    const opportunity = await Opportunity.findByPk(opportunityId)
+    if (!opportunity) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Opportunity not found' 
+      })
     }
 
     // Check if already saved
-    const existing = await SavedOpportunity.findOne({
-      where: { opportunityId, volunteerId: volunteer.id }
+    const existingSave = await SavedOpportunity.findOne({
+      where: { 
+        opportunityId, 
+        volunteerId: volunteer.id 
+      }
     })
 
-    if (existing) {
-      return res.status(400).json({ message: 'Already saved' })
+    if (existingSave) {
+      console.log('⚠️ Already saved')
+      return res.status(400).json({ 
+        success: false,
+        message: 'Opportunity already saved' 
+      })
     }
 
-    await SavedOpportunity.create({
+    // Create saved opportunity
+    const saved = await SavedOpportunity.create({
       opportunityId,
       volunteerId: volunteer.id
     })
 
+    console.log('✅ Opportunity saved successfully')
+
     res.status(201).json({
       success: true,
-      message: 'Opportunity saved successfully'
+      message: 'Opportunity saved successfully',
+      data: saved
     })
   } catch (error) {
-    console.error('Save opportunity error:', error)
-    res.status(500).json({ message: 'Failed to save opportunity', error: error.message })
+    console.error('❌ Save opportunity error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to save opportunity', 
+      error: error.message 
+    })
   }
 })
 
@@ -74,28 +156,86 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
   try {
     const { opportunityId } = req.params
 
+    console.log('🗑️ Unsaving opportunity:', opportunityId, 'for user:', req.user.id)
+
+    // Find volunteer profile
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    
     if (!volunteer) {
-      return res.status(403).json({ message: 'Volunteer profile not found' })
+      console.log('❌ Volunteer profile not found')
+      return res.status(403).json({ 
+        success: false,
+        message: 'Volunteer profile not found' 
+      })
     }
 
+    // Find saved opportunity
     const saved = await SavedOpportunity.findOne({
-      where: { opportunityId, volunteerId: volunteer.id }
+      where: { 
+        opportunityId, 
+        volunteerId: volunteer.id 
+      }
     })
 
     if (!saved) {
-      return res.status(404).json({ message: 'Saved opportunity not found' })
+      console.log('❌ Saved opportunity not found')
+      return res.status(404).json({ 
+        success: false,
+        message: 'Saved opportunity not found' 
+      })
     }
 
+    // Delete saved opportunity
     await saved.destroy()
+
+    console.log('✅ Opportunity unsaved successfully')
 
     res.json({
       success: true,
-      message: 'Opportunity unsaved successfully'
+      message: 'Opportunity removed from saved list'
     })
   } catch (error) {
-    console.error('Unsave opportunity error:', error)
-    res.status(500).json({ message: 'Failed to unsave opportunity', error: error.message })
+    console.error('❌ Unsave opportunity error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to unsave opportunity', 
+      error: error.message 
+    })
+  }
+})
+
+// Check if opportunity is saved
+router.get('/check/:opportunityId', authenticate, async (req, res) => {
+  try {
+    const { opportunityId } = req.params
+
+    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    
+    if (!volunteer) {
+      return res.json({ 
+        success: true,
+        isSaved: false 
+      })
+    }
+
+    const saved = await SavedOpportunity.findOne({
+      where: { 
+        opportunityId, 
+        volunteerId: volunteer.id 
+      }
+    })
+
+    res.json({
+      success: true,
+      isSaved: !!saved
+    })
+  } catch (error) {
+    console.error('Check saved error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to check saved status', 
+      error: error.message 
+    })
   }
 })
 
