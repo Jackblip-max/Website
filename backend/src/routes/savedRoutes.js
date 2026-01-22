@@ -1,5 +1,5 @@
 import express from 'express'
-import { SavedOpportunity, Opportunity, Organization, Volunteer } from '../models/index.js'
+import { SavedOpportunity, Opportunity, Organization, Volunteer, User } from '../models/index.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -9,18 +9,23 @@ router.get('/', authenticate, async (req, res) => {
   try {
     console.log('📚 Fetching saved opportunities for user:', req.user.id)
     
-    // Find volunteer profile
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    // Find or create volunteer profile (users can be both volunteer AND organization owner)
+    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      console.log('❌ Volunteer profile not found for user:', req.user.id)
-      return res.status(403).json({ 
-        success: false,
-        message: 'Volunteer profile not found. Only volunteers can save opportunities.' 
+      // Auto-create volunteer profile if it doesn't exist
+      console.log('📝 Creating volunteer profile for user:', req.user.id)
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       })
     }
 
-    console.log('✅ Found volunteer:', volunteer.id)
+    console.log('✅ Found/Created volunteer:', volunteer.id)
 
     // Fetch saved opportunities with full details
     const savedOpportunities = await SavedOpportunity.findAll({
@@ -92,23 +97,43 @@ router.post('/', authenticate, async (req, res) => {
 
     console.log('💾 Saving opportunity:', opportunityId, 'for user:', req.user.id)
 
-    // Find volunteer profile
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    // Find or create volunteer profile (users can be both volunteer AND organization owner)
+    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      console.log('❌ Volunteer profile not found')
-      return res.status(403).json({ 
-        success: false,
-        message: 'Volunteer profile not found. Only volunteers can save opportunities.' 
+      // Auto-create volunteer profile if it doesn't exist
+      console.log('📝 Creating volunteer profile for user:', req.user.id)
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       })
     }
 
-    // Check if opportunity exists
-    const opportunity = await Opportunity.findByPk(opportunityId)
+    // Check if opportunity exists and get its organization
+    const opportunity = await Opportunity.findByPk(opportunityId, {
+      include: [{
+        model: Organization,
+        as: 'organization',
+        attributes: ['id', 'userId']
+      }]
+    })
+
     if (!opportunity) {
       return res.status(404).json({ 
         success: false,
         message: 'Opportunity not found' 
+      })
+    }
+
+    // Check if user is trying to save their own organization's opportunity
+    if (opportunity.organization && opportunity.organization.userId === req.user.id) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You cannot save opportunities from your own organization' 
       })
     }
 
@@ -163,7 +188,7 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
     
     if (!volunteer) {
       console.log('❌ Volunteer profile not found')
-      return res.status(403).json({ 
+      return res.status(404).json({ 
         success: false,
         message: 'Volunteer profile not found' 
       })
@@ -209,12 +234,18 @@ router.get('/check/:opportunityId', authenticate, async (req, res) => {
   try {
     const { opportunityId } = req.params
 
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    // Find or create volunteer profile
+    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      return res.json({ 
-        success: true,
-        isSaved: false 
+      // Auto-create volunteer profile
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       })
     }
 
