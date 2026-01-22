@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Calendar, Clock, Bookmark, Share2, AlertCircle } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
@@ -10,20 +10,50 @@ import { volunteerService } from '../../services/volunteerService'
 const OpportunityCard = ({ opportunity }) => {
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const queryClient = useQueryClient()
-  const [isSaved, setIsSaved] = useState(opportunity.isSaved || false)
+  
+  // Check if opportunity is saved
+  const { data: savedStatus } = useQuery({
+    queryKey: ['savedStatus', opportunity.id],
+    queryFn: () => volunteerService.checkIfSaved(opportunity.id),
+    enabled: isAuthenticated && user?.role === 'volunteer',
+    staleTime: 0 // Always fetch fresh data
+  })
+
+  const [isSaved, setIsSaved] = useState(false)
+
+  // Update isSaved state when savedStatus changes
+  useEffect(() => {
+    if (savedStatus?.isSaved !== undefined) {
+      setIsSaved(savedStatus.isSaved)
+    }
+  }, [savedStatus])
 
   const saveMutation = useMutation({
     mutationFn: (oppId) => 
       isSaved ? volunteerService.unsaveOpportunity(oppId) : volunteerService.saveOpportunity(oppId),
-    onSuccess: () => {
+    onMutate: () => {
+      // Optimistically update UI
       setIsSaved(!isSaved)
-      toast.success(isSaved ? 'Removed from saved' : 'Saved successfully!')
-      queryClient.invalidateQueries(['savedOpportunities'])
     },
-    onError: () => {
-      toast.error('Failed to save opportunity')
+    onSuccess: (data, oppId) => {
+      const message = isSaved ? 'Removed from saved' : 'Saved successfully!'
+      toast.success(message)
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries(['savedOpportunities'])
+      queryClient.invalidateQueries(['savedStatus', oppId])
+    },
+    onError: (error, oppId) => {
+      // Revert optimistic update on error
+      setIsSaved(!isSaved)
+      
+      const message = error.response?.data?.message || 'Failed to save opportunity'
+      toast.error(message)
+      
+      // Invalidate to ensure UI is in sync
+      queryClient.invalidateQueries(['savedStatus', oppId])
     }
   })
 
@@ -39,16 +69,26 @@ const OpportunityCard = ({ opportunity }) => {
     }
   })
 
-  const handleSave = () => {
+  const handleSave = (e) => {
+    e.stopPropagation()
+    
     if (!isAuthenticated) {
       toast.error('Please login to save opportunities')
       setTimeout(() => navigate('/login'), 1500)
       return
     }
+
+    if (user?.role !== 'volunteer') {
+      toast.error('Only volunteers can save opportunities')
+      return
+    }
+    
     saveMutation.mutate(opportunity.id)
   }
 
-  const handleApply = () => {
+  const handleApply = (e) => {
+    e.stopPropagation()
+    
     if (!isAuthenticated) {
       // Show custom toast with register/login options
       toast((toastInstance) => (
@@ -94,7 +134,8 @@ const OpportunityCard = ({ opportunity }) => {
     applyMutation.mutate(opportunity.id)
   }
 
-  const handleShare = () => {
+  const handleShare = (e) => {
+    e.stopPropagation()
     const url = `${window.location.origin}/opportunities/${opportunity.id}`
     navigator.clipboard.writeText(url)
     toast.success('Link copied to clipboard!')
