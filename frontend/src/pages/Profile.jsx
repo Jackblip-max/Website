@@ -116,9 +116,6 @@ const Profile = () => {
               <h1 className="text-3xl font-bold mb-2">{user.name}</h1>
               <p className="text-emerald-100 text-lg">{user.email}</p>
               <div className="flex items-center space-x-4 mt-2">
-                <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium">
-                  {user.role === 'volunteer' ? '🤝 Volunteer' : '🏢 Organization'}
-                </span>
                 {user.isVerified && (
                   <span className="bg-green-500 px-3 py-1 rounded-full text-sm font-medium">
                     ✓ Verified
