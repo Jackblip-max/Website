@@ -26,6 +26,11 @@ export const volunteerService = {
     return await api.delete(`/saved/${opportunityId}`)
   },
 
+  // NEW: Check if opportunity is saved
+  checkIfSaved: async (opportunityId) => {
+    return await api.get(`/saved/check/${opportunityId}`)
+  },
+
   getSavedOpportunities: async () => {
     return await api.get('/saved')
   },
