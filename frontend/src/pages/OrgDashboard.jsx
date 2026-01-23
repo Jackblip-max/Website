@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, Phone, AlertCircle, Edit } from 'lucide-react'
+import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, AlertCircle, Edit, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
 import { organizationService } from '../services/organizationService'
@@ -14,51 +14,141 @@ const OrgDashboard = () => {
   // Fetch organization details
   const { data: organization, isLoading: orgLoading } = useQuery({
     queryKey: ['myOrganization'],
-    queryFn: organizationService.getMyOrganization
-  })
-
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['orgStats'],
-    queryFn: organizationService.getOrganizationStats
-  })
-
-  const { data: opportunities, isLoading: oppsLoading } = useQuery({
-    queryKey: ['orgOpportunities'],
-    queryFn: organizationService.getOrganizationOpportunities
-  })
-
-  const { data: applicants, isLoading: applicantsLoading } = useQuery({
-    queryKey: ['applicants'],
     queryFn: async () => {
-      if (!opportunities?.length) return []
-      const allApplicants = await Promise.all(
-        opportunities.map(opp => organizationService.getApplicants(opp.id))
-      )
-      return allApplicants.flat()
-    },
-    enabled: !!opportunities?.length
-  })
-
-  const acceptMutation = useMutation({
-    mutationFn: (applicationId) => organizationService.acceptApplicant(applicationId),
-    onSuccess: () => {
-      toast.success('Applicant accepted!')
-      queryClient.invalidateQueries(['applicants'])
-      queryClient.invalidateQueries(['orgStats'])
+      console.log('📊 Fetching organization details...')
+      const result = await organizationService.getMyOrganization()
+      console.log('✅ Organization data:', result)
+      return result
     }
   })
 
+  // Fetch organization stats
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['orgStats'],
+    queryFn: async () => {
+      console.log('📊 Fetching organization stats...')
+      const result = await organizationService.getOrganizationStats()
+      console.log('✅ Stats data:', result)
+      return result
+    }
+  })
+
+  // Fetch organization opportunities
+  const { data: opportunities, isLoading: oppsLoading } = useQuery({
+    queryKey: ['orgOpportunities'],
+    queryFn: async () => {
+      console.log('📊 Fetching organization opportunities...')
+      const result = await organizationService.getOrganizationOpportunities()
+      console.log('✅ Opportunities data:', result)
+      return result
+    }
+  })
+
+  // Fetch applicants for all opportunities
+  const { data: applicants, isLoading: applicantsLoading, error: applicantsError } = useQuery({
+    queryKey: ['applicants', opportunities],
+    queryFn: async () => {
+      // Extract opportunities data from response
+      const oppsData = opportunities?.data || opportunities || []
+      
+      console.log('📊 Processing opportunities for applicants...')
+      console.log('📊 Opportunities count:', oppsData.length)
+      
+      if (!oppsData.length) {
+        console.log('⚠️ No opportunities found, skipping applicants fetch')
+        return []
+      }
+      
+      console.log('📊 Fetching applicants for opportunities:', oppsData.map(o => ({ id: o.id, title: o.title })))
+      
+      try {
+        const allApplicantsPromises = oppsData.map(async (opp) => {
+          try {
+            console.log('🔍 Fetching applicants for opportunity:', opp.id, '-', opp.title)
+            const result = await organizationService.getApplicants(opp.id)
+            console.log('📦 Raw applicants response for', opp.title, ':', result)
+            
+            // Handle different response structures from api.js interceptor
+            let applicantsData = []
+            
+            if (result?.data && Array.isArray(result.data)) {
+              // Response is { success: true, data: [...] }
+              applicantsData = result.data
+              console.log('✓ Extracted from result.data, count:', applicantsData.length)
+            } else if (Array.isArray(result)) {
+              // Response is directly an array
+              applicantsData = result
+              console.log('✓ Using result directly, count:', applicantsData.length)
+            } else {
+              console.warn('⚠️ Unexpected response structure for opportunity', opp.id, ':', result)
+            }
+            
+            return applicantsData
+          } catch (error) {
+            console.error('❌ Error fetching applicants for opportunity', opp.id, ':', error)
+            return []
+          }
+        })
+        
+        const allApplicantsArrays = await Promise.all(allApplicantsPromises)
+        const flatApplicants = allApplicantsArrays.flat()
+        
+        console.log('✅ Total applicants fetched:', flatApplicants.length)
+        console.log('📋 Applicants list:', flatApplicants)
+        
+        return flatApplicants
+      } catch (error) {
+        console.error('❌ Error in applicants fetch:', error)
+        return []
+      }
+    },
+    enabled: !!opportunities && (opportunities?.data?.length > 0 || opportunities?.length > 0),
+    retry: 2
+  })
+
+  // Accept application mutation
+  const acceptMutation = useMutation({
+    mutationFn: async (applicationId) => {
+      console.log('✅ Accepting application:', applicationId)
+      return await organizationService.acceptApplicant(applicationId)
+    },
+    onSuccess: () => {
+      toast.success('Applicant accepted! 🎉')
+      queryClient.invalidateQueries(['applicants'])
+      queryClient.invalidateQueries(['orgStats'])
+    },
+    onError: (error) => {
+      console.error('❌ Accept error:', error)
+      toast.error(error.response?.data?.message || 'Failed to accept applicant')
+    }
+  })
+
+  // Decline application mutation
   const declineMutation = useMutation({
-    mutationFn: (applicationId) => organizationService.declineApplicant(applicationId),
+    mutationFn: async (applicationId) => {
+      console.log('❌ Declining application:', applicationId)
+      return await organizationService.declineApplicant(applicationId)
+    },
     onSuccess: () => {
       toast.success('Applicant declined')
       queryClient.invalidateQueries(['applicants'])
+    },
+    onError: (error) => {
+      console.error('❌ Decline error:', error)
+      toast.error(error.response?.data?.message || 'Failed to decline applicant')
     }
   })
 
-  if (statsLoading || oppsLoading || orgLoading) return <Loader />
+  // Show loading state
+  if (statsLoading || oppsLoading || orgLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader />
+      </div>
+    )
+  }
 
-  // Extract organization data
+  // Extract organization data from response
   const orgData = organization?.data || organization
 
   return (
@@ -68,7 +158,7 @@ const OrgDashboard = () => {
         {orgData && (
           <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
             <div className="flex items-start justify-between mb-6">
-              <div className="flex items-start space-x-4">
+              <div className="flex items-start space-x-4 flex-1">
                 {/* Logo */}
                 {orgData.logo ? (
                   <img 
@@ -85,15 +175,20 @@ const OrgDashboard = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h2 className="text-3xl font-bold text-gray-900">{orgData.name}</h2>
-                    {orgData.isVerified ? (
+                    {orgData.isVerified || orgData.verificationStatus === 'approved' ? (
                       <span className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                         <Check className="w-4 h-4" />
                         Verified
                       </span>
-                    ) : (
+                    ) : orgData.verificationStatus === 'pending' ? (
                       <span className="flex items-center gap-1 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
-                        <AlertCircle className="w-4 h-4" />
+                        <Clock className="w-4 h-4" />
                         Pending Verification
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                        <AlertCircle className="w-4 h-4" />
+                        Not Verified
                       </span>
                     )}
                   </div>
@@ -110,12 +205,26 @@ const OrgDashboard = () => {
                     </div>
                   </div>
 
-                  {!orgData.isVerified && (
+                  {orgData.verificationStatus === 'pending' && (
                     <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                       <p className="text-sm text-orange-800">
                         <AlertCircle className="w-4 h-4 inline mr-1" />
-                        Your organization is pending verification. Some features may be limited until verification is complete.
+                        Your organization is pending admin verification. You cannot post opportunities until approved.
                       </p>
+                    </div>
+                  )}
+                  
+                  {orgData.verificationStatus === 'rejected' && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-800">
+                        <AlertCircle className="w-4 h-4 inline mr-1" />
+                        Your organization verification was rejected. Please contact support or update your information.
+                      </p>
+                      {orgData.verificationReason && (
+                        <p className="text-sm text-red-700 mt-2">
+                          <strong>Reason:</strong> {orgData.verificationReason}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -123,7 +232,7 @@ const OrgDashboard = () => {
 
               <Link
                 to="/org/edit"
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap ml-4"
               >
                 <Edit className="w-4 h-4" />
                 Edit Details
@@ -150,7 +259,7 @@ const OrgDashboard = () => {
             <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
             <Link
               to="/add-job"
-              className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 font-medium flex items-center space-x-2"
+              className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 font-medium flex items-center space-x-2 transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span>{t('addJob')}</span>
@@ -189,63 +298,99 @@ const OrgDashboard = () => {
           </div>
 
           {/* Applicants List */}
-          <h3 className="text-xl font-bold text-gray-900 mb-4">{t('applicants')}</h3>
-          {applicantsLoading ? (
-            <Loader />
-          ) : applicants && applicants.length > 0 ? (
-            <div className="space-y-4">
-              {applicants.map((applicant) => (
-                <div key={applicant.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{applicant.volunteerName}</p>
-                      <p className="text-sm text-gray-600">Applied for: {applicant.opportunityTitle}</p>
-                      <p className="text-xs text-gray-500">{applicant.email} • {applicant.phone}</p>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t('applicants')}</h3>
+            
+            {applicantsLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader />
+              </div>
+            ) : applicantsError ? (
+              <div className="text-center py-12 bg-red-50 rounded-lg border border-red-200">
+                <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                <p className="text-red-600 text-lg font-medium">Failed to load applicants</p>
+                <p className="text-red-500 text-sm mt-2">{applicantsError.message}</p>
+              </div>
+            ) : applicants && applicants.length > 0 ? (
+              <div className="space-y-4">
+                {applicants.map((applicant) => (
+                  <div key={applicant.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 flex-1">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                          {applicant.volunteerName?.charAt(0) || 'V'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900 text-lg">{applicant.volunteerName}</p>
+                          <p className="text-sm text-gray-600 font-medium">Applied for: {applicant.opportunityTitle}</p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {applicant.email}
+                            </p>
+                            {applicant.phone && (
+                              <p className="text-xs text-gray-500">{applicant.phone}</p>
+                            )}
+                          </div>
+                          {applicant.skills && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              <strong>Skills:</strong> {applicant.skills}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="ml-4">
+                        {applicant.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => acceptMutation.mutate(applicant.id)}
+                              disabled={acceptMutation.isPending}
+                              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center space-x-1 disabled:opacity-50 transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span>{t('accept')}</span>
+                            </button>
+                            <button
+                              onClick={() => declineMutation.mutate(applicant.id)}
+                              disabled={declineMutation.isPending}
+                              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center space-x-1 disabled:opacity-50 transition-colors"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              <span>{t('decline')}</span>
+                            </button>
+                          </div>
+                        )}
+                        {applicant.status === 'accepted' && (
+                          <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium inline-flex items-center gap-1">
+                            <Check className="w-4 h-4" />
+                            {t('accepted')}
+                          </span>
+                        )}
+                        {applicant.status === 'rejected' && (
+                          <span className="px-4 py-2 bg-red-100 text-red-800 rounded-lg font-medium inline-flex items-center gap-1">
+                            <XCircle className="w-4 h-4" />
+                            {t('rejected')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {applicant.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => acceptMutation.mutate(applicant.id)}
-                        disabled={acceptMutation.isPending}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center space-x-1"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>{t('accept')}</span>
-                      </button>
-                      <button
-                        onClick={() => declineMutation.mutate(applicant.id)}
-                        disabled={declineMutation.isPending}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center space-x-1"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>{t('decline')}</span>
-                      </button>
-                    </div>
-                  )}
-                  {applicant.status === 'accepted' && (
-                    <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium">
-                      {t('accepted')}
-                    </span>
-                  )}
-                  {applicant.status === 'rejected' && (
-                    <span className="px-4 py-2 bg-red-100 text-red-800 rounded-lg font-medium">
-                      {t('rejected')}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg font-medium">No applicants yet</p>
-              <p className="text-gray-500 text-sm mt-2">Post some volunteer opportunities to start receiving applications</p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg font-medium">No applicants yet</p>
+                <p className="text-gray-500 text-sm mt-2">
+                  {(opportunities?.data?.length || opportunities?.length || 0) > 0 
+                    ? 'Your opportunities are live! Applications will appear here when volunteers apply.'
+                    : 'Post some volunteer opportunities to start receiving applications'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
