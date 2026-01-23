@@ -32,8 +32,8 @@ import Applications from './pages/Applications'
 // Organization Pages
 import CreateOrganization from './pages/CreateOrganization'
 import OrgDashboard from './pages/OrgDashboard'
-import AddJob from './pages/AddJob'
 import EditOrganization from './pages/EditOrganization'
+import AddJob from './pages/AddJob'
 
 // Other
 import NotFound from './pages/NotFound'
@@ -158,18 +158,18 @@ function App() {
                   } 
                 />
                 <Route 
-                  path="/add-job" 
-                  element={
-                    <ProtectedRoute>
-                      <AddJob />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
                   path="/org/edit" 
                   element={
                     <ProtectedRoute>
                       <EditOrganization />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/add-job" 
+                  element={
+                    <ProtectedRoute>
+                      <AddJob />
                     </ProtectedRoute>
                   } 
                 />
