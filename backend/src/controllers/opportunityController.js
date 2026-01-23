@@ -1,4 +1,4 @@
-import { Opportunity, Organization, Application, SavedOpportunity, Volunteer } from '../models/index.js'
+import { Opportunity, Organization, Application, SavedOpportunity, Volunteer, User } from '../models/index.js'
 import { Op } from 'sequelize'
 
 export const getOpportunities = async (req, res) => {
@@ -86,7 +86,7 @@ export const createOpportunity = async (req, res) => {
       return res.status(403).json({ message: 'Only organizations can create opportunities' })
     }
 
-    // ⭐ NEW: Check if organization is approved
+    // Check if organization is approved
     if (organization.verificationStatus !== 'approved') {
       return res.status(403).json({ 
         success: false,
@@ -180,6 +180,8 @@ export const getApplicants = async (req, res) => {
   try {
     const { id } = req.params
 
+    console.log('📋 Getting applicants for opportunity:', id)
+
     const opportunity = await Opportunity.findByPk(id, {
       include: [{
         model: Organization,
@@ -188,21 +190,31 @@ export const getApplicants = async (req, res) => {
     })
 
     if (!opportunity) {
+      console.log('❌ Opportunity not found:', id)
       return res.status(404).json({ message: 'Opportunity not found' })
     }
 
     if (opportunity.organization.userId !== req.user.id) {
+      console.log('❌ User not authorized:', req.user.id)
       return res.status(403).json({ message: 'Not authorized' })
     }
+
+    console.log('✅ Fetching applications for opportunity:', id)
 
     const applications = await Application.findAll({
       where: { opportunityId: id },
       include: [{
         model: Volunteer,
         as: 'volunteer',
-        include: [{ model: User, as: 'user', attributes: ['name', 'email', 'phone'] }]
+        include: [{ 
+          model: User, 
+          as: 'user', 
+          attributes: ['name', 'email', 'phone'] 
+        }]
       }]
     })
+
+    console.log('✅ Found', applications.length, 'applications')
 
     const formattedApplicants = applications.map(app => ({
       id: app.id,
@@ -216,12 +228,18 @@ export const getApplicants = async (req, res) => {
       opportunityTitle: opportunity.title
     }))
 
+    console.log('✅ Returning', formattedApplicants.length, 'formatted applicants')
+
     res.json({
       success: true,
       data: formattedApplicants
     })
   } catch (error) {
-    console.error('Get applicants error:', error)
-    res.status(500).json({ message: 'Failed to get applicants', error: error.message })
+    console.error('❌ Get applicants error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to get applicants', 
+      error: error.message 
+    })
   }
 }
