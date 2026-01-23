@@ -7,21 +7,30 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import cron from 'node-cron'
 import session from 'express-session'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import passport from './src/config/passport.js'
 import { sequelize } from './src/config/database.js'
 import { checkExpiredDeadlines, sendDeadlineReminders } from './src/jobs/deadlineChecker.js'
 import routes from './src/routes/index.js'
 import { errorHandler } from './src/middleware/errorHandler.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 const PORT = process.env.PORT || 5000
 const app = express()
 
 // Middleware
-app.use(helmet())
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}))
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }))
+
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -43,8 +52,14 @@ app.use(session({
 app.use(passport.initialize())
 app.use(passport.session())
 
-// Static files
-app.use('/uploads', express.static('uploads'))
+// Static files - CRITICAL for logo display
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
+// Add logging for static file requests
+app.use('/uploads', (req, res, next) => {
+  console.log('📁 Static file request:', req.url)
+  next()
+})
 
 // Routes
 app.use('/api', routes)
@@ -97,6 +112,9 @@ const startServer = async () => {
   console.log('✅ Cron jobs scheduled:')
   console.log('   - Deadline reminders: Every day at 9:00 AM')
   console.log('   - Expired deadlines: Every day at 12:00 AM')
+  
+  console.log('📁 Static files directory:', path.join(__dirname, 'uploads'))
+  console.log('📁 Uploads accessible at: http://localhost:' + PORT + '/uploads/')
   
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
