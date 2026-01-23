@@ -48,7 +48,6 @@ const OrgDashboard = () => {
   const { data: applicants, isLoading: applicantsLoading, error: applicantsError } = useQuery({
     queryKey: ['applicants', opportunities],
     queryFn: async () => {
-      // Extract opportunities data from response
       const oppsData = opportunities?.data || opportunities || []
       
       console.log('📊 Processing opportunities for applicants...')
@@ -68,15 +67,12 @@ const OrgDashboard = () => {
             const result = await organizationService.getApplicants(opp.id)
             console.log('📦 Raw applicants response for', opp.title, ':', result)
             
-            // Handle different response structures from api.js interceptor
             let applicantsData = []
             
             if (result?.data && Array.isArray(result.data)) {
-              // Response is { success: true, data: [...] }
               applicantsData = result.data
               console.log('✓ Extracted from result.data, count:', applicantsData.length)
             } else if (Array.isArray(result)) {
-              // Response is directly an array
               applicantsData = result
               console.log('✓ Using result directly, count:', applicantsData.length)
             } else {
@@ -151,6 +147,17 @@ const OrgDashboard = () => {
   // Extract organization data from response
   const orgData = organization?.data || organization
 
+  // Get full logo URL
+  const getLogoUrl = (logo) => {
+    if (!logo) return null
+    if (logo.startsWith('http')) return logo
+    
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
+    return `${baseUrl}${logo}`
+  }
+
+  const logoUrl = getLogoUrl(orgData?.logo)
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
@@ -160,17 +167,27 @@ const OrgDashboard = () => {
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-start space-x-4 flex-1">
                 {/* Logo */}
-                {orgData.logo ? (
+                {logoUrl ? (
                   <img 
-                    src={orgData.logo} 
+                    src={logoUrl} 
                     alt={orgData.name}
                     className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200"
+                    onError={(e) => {
+                      console.error('Logo failed to load:', logoUrl)
+                      e.target.onerror = null
+                      // Fallback to initial
+                      e.target.style.display = 'none'
+                      e.target.nextSibling.style.display = 'flex'
+                    }}
                   />
-                ) : (
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
-                    {orgData.name?.charAt(0) || 'O'}
-                  </div>
-                )}
+                ) : null}
+                {/* Fallback Logo */}
+                <div 
+                  className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl"
+                  style={{ display: logoUrl ? 'none' : 'flex' }}
+                >
+                  {orgData.name?.charAt(0) || 'O'}
+                </div>
                 
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
