@@ -9,23 +9,18 @@ router.get('/', authenticate, async (req, res) => {
   try {
     console.log('📚 Fetching saved opportunities for user:', req.user.id)
     
-    // Find or create volunteer profile (users can be both volunteer AND organization owner)
-    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    // User MUST have volunteer profile from registration
+    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      // Auto-create volunteer profile if it doesn't exist
-      console.log('📝 Creating volunteer profile for user:', req.user.id)
-      volunteer = await Volunteer.create({
-        userId: req.user.id,
-        education: 'undergraduate',
-        skills: '',
-        preferredCategories: [],
-        preferredModes: [],
-        notificationsEnabled: true
+      console.log('❌ No volunteer profile found for user:', req.user.id)
+      return res.status(400).json({ 
+        success: false,
+        message: 'Volunteer profile not found. Please complete your profile.' 
       })
     }
 
-    console.log('✅ Found/Created volunteer:', volunteer.id)
+    console.log('✅ Found volunteer:', volunteer.id)
 
     // Fetch saved opportunities with full details
     const savedOpportunities = await SavedOpportunity.findAll({
@@ -95,56 +90,65 @@ router.post('/', authenticate, async (req, res) => {
       })
     }
 
-    console.log('💾 Saving opportunity:', opportunityId, 'for user:', req.user.id)
+    console.log('💾 Save request - User:', req.user.id, 'Opportunity:', opportunityId)
 
-    // Find or create volunteer profile (users can be both volunteer AND organization owner)
-    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    // User MUST have volunteer profile from registration
+    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      // Auto-create volunteer profile if it doesn't exist
-      console.log('📝 Creating volunteer profile for user:', req.user.id)
-      volunteer = await Volunteer.create({
-        userId: req.user.id,
-        education: 'undergraduate',
-        skills: '',
-        preferredCategories: [],
-        preferredModes: [],
-        notificationsEnabled: true
+      console.log('❌ No volunteer profile found')
+      return res.status(400).json({ 
+        success: false,
+        message: 'Volunteer profile not found. Please complete your profile.' 
       })
     }
+
+    console.log('✅ Volunteer profile found:', volunteer.id)
 
     // Check if opportunity exists and get its organization
     const opportunity = await Opportunity.findByPk(opportunityId, {
       include: [{
         model: Organization,
         as: 'organization',
-        attributes: ['id', 'userId']
+        attributes: ['id', 'userId', 'name']
       }]
     })
 
     if (!opportunity) {
+      console.log('❌ Opportunity not found:', opportunityId)
       return res.status(404).json({ 
         success: false,
         message: 'Opportunity not found' 
       })
     }
 
-    // FIXED: Only check if user owns the organization IF they have an organization
-    // Find if user has an organization
+    console.log('✅ Opportunity found:', opportunity.title)
+    console.log('📋 Opportunity belongs to org:', opportunity.organization?.name, '(orgId:', opportunity.organizationId, ')')
+
+    // CRITICAL: Check if user owns an organization
     const userOrganization = await Organization.findOne({
       where: { userId: req.user.id }
     })
 
-    // Only prevent saving if:
-    // 1. User HAS an organization, AND
-    // 2. They're trying to save their OWN organization's opportunity
+    if (userOrganization) {
+      console.log('🏢 User has organization:', userOrganization.name, '(id:', userOrganization.id, ')')
+    } else {
+      console.log('👤 User has NO organization')
+    }
+
+    // ONLY prevent saving if:
+    // 1. User HAS an organization (userOrganization exists)
+    // AND
+    // 2. The opportunity belongs to THEIR organization
     if (userOrganization && opportunity.organizationId === userOrganization.id) {
-      console.log('❌ User trying to save their own organization opportunity')
+      console.log('❌ BLOCKED: User trying to save their own organization\'s opportunity')
       return res.status(400).json({ 
         success: false,
         message: 'You cannot save opportunities from your own organization' 
       })
     }
+
+    console.log('✅ Ownership check passed - user can save this opportunity')
 
     // Check if already saved
     const existingSave = await SavedOpportunity.findOne({
@@ -168,7 +172,7 @@ router.post('/', authenticate, async (req, res) => {
       volunteerId: volunteer.id
     })
 
-    console.log('✅ Opportunity saved successfully')
+    console.log('✅ Opportunity saved successfully - SavedOpportunity ID:', saved.id)
 
     res.status(201).json({
       success: true,
@@ -177,6 +181,7 @@ router.post('/', authenticate, async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Save opportunity error:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Failed to save opportunity', 
@@ -197,7 +202,7 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
     
     if (!volunteer) {
       console.log('❌ Volunteer profile not found')
-      return res.status(404).json({ 
+      return res.status(400).json({ 
         success: false,
         message: 'Volunteer profile not found' 
       })
@@ -243,18 +248,12 @@ router.get('/check/:opportunityId', authenticate, async (req, res) => {
   try {
     const { opportunityId } = req.params
 
-    // Find or create volunteer profile
-    let volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
+    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
-      // Auto-create volunteer profile
-      volunteer = await Volunteer.create({
-        userId: req.user.id,
-        education: 'undergraduate',
-        skills: '',
-        preferredCategories: [],
-        preferredModes: [],
-        notificationsEnabled: true
+      return res.json({
+        success: true,
+        isSaved: false
       })
     }
 
