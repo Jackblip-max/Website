@@ -129,8 +129,17 @@ router.post('/', authenticate, async (req, res) => {
       })
     }
 
-    // Check if user is trying to save their own organization's opportunity
-    if (opportunity.organization && opportunity.organization.userId === req.user.id) {
+    // FIXED: Only check if user owns the organization IF they have an organization
+    // Find if user has an organization
+    const userOrganization = await Organization.findOne({
+      where: { userId: req.user.id }
+    })
+
+    // Only prevent saving if:
+    // 1. User HAS an organization, AND
+    // 2. They're trying to save their OWN organization's opportunity
+    if (userOrganization && opportunity.organizationId === userOrganization.id) {
+      console.log('❌ User trying to save their own organization opportunity')
       return res.status(400).json({ 
         success: false,
         message: 'You cannot save opportunities from your own organization' 
