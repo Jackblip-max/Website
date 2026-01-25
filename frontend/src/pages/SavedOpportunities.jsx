@@ -199,12 +199,7 @@ const SavedOpportunities = () => {
                   key={opportunity.id}
                   className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden group"
                 >
-                  <div className="p-6">
-                    {/* Debug Badge */}
-                    <div className="mb-2 text-xs text-gray-500 font-mono">
-                      ID: {opportunity.id}
-                    </div>
-                    
+                  <div className="p-6">           
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
