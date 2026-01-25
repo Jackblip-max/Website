@@ -7,20 +7,24 @@ const router = express.Router()
 // Get saved opportunities
 router.get('/', authenticate, async (req, res) => {
   try {
-    console.log('📚 Fetching saved opportunities for user:', req.user.id)
-    
+    console.log('📚 ========== GET SAVED OPPORTUNITIES ==========')
+    console.log('📚 User ID:', req.user.id)
+    console.log('📚 User Email:', req.user.email)
+
     // User MUST have volunteer profile from registration
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
     
     if (!volunteer) {
       console.log('❌ No volunteer profile found for user:', req.user.id)
-      return res.status(400).json({ 
-        success: false,
-        message: 'Volunteer profile not found. Please complete your profile.' 
+      return res.json({
+        success: true,
+        data: [],
+        count: 0,
+        message: 'No volunteer profile found. Please complete your registration.'
       })
     }
 
-    console.log('✅ Found volunteer:', volunteer.id)
+    console.log('✅ Found volunteer profile - Volunteer ID:', volunteer.id)
 
     // Fetch saved opportunities with full details
     const savedOpportunities = await SavedOpportunity.findAll({
@@ -31,20 +35,37 @@ router.get('/', authenticate, async (req, res) => {
         include: [{
           model: Organization,
           as: 'organization',
-          attributes: ['id', 'name', 'logo', 'description']
+          attributes: ['id', 'name', 'logo', 'description', 'contactDetails']
         }],
-        attributes: ['id', 'title', 'description', 'category', 'location', 'mode', 'timeCommitment', 'requirements', 'benefits', 'deadline', 'status', 'createdAt']
+        attributes: ['id', 'title', 'description', 'category', 'location', 'mode', 'timeCommitment', 'requirements', 'benefits', 'deadline', 'status']
       }],
       order: [['createdAt', 'DESC']]
     })
 
-    console.log('✅ Found', savedOpportunities.length, 'saved opportunities')
+    console.log('📦 Database query completed')
+    console.log('📦 Found saved opportunities count:', savedOpportunities.length)
+    
+    if (savedOpportunities.length > 0) {
+      console.log('📦 Saved opportunity IDs:', savedOpportunities.map(s => ({
+        savedId: s.id,
+        opportunityId: s.opportunityId,
+        title: s.opportunity?.title
+      })))
+    } else {
+      console.log('📦 No saved opportunities in database for volunteer:', volunteer.id)
+    }
 
     // Transform data to include organization details at the top level
     const formattedData = savedOpportunities.map(saved => {
       const opp = saved.opportunity
+      
+      if (!opp) {
+        console.warn('⚠️ SavedOpportunity has no opportunity data:', saved.id)
+        return null
+      }
+      
       return {
-        id: opp.id,
+        id: opp.id,  // This is the OPPORTUNITY ID, not the saved_opportunity ID
         title: opp.title,
         description: opp.description,
         category: opp.category,
@@ -61,7 +82,11 @@ router.get('/', authenticate, async (req, res) => {
         savedAt: saved.createdAt,
         isSaved: true
       }
-    })
+    }).filter(Boolean) // Remove any null entries
+
+    console.log('📤 Sending response with', formattedData.length, 'opportunities')
+    console.log('📤 Response data:', JSON.stringify(formattedData, null, 2))
+    console.log('📚 ========== END GET SAVED OPPORTUNITIES ==========\n')
 
     res.json({
       success: true,
@@ -70,6 +95,7 @@ router.get('/', authenticate, async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Get saved opportunities error:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Failed to get saved opportunities', 
@@ -90,7 +116,9 @@ router.post('/', authenticate, async (req, res) => {
       })
     }
 
-    console.log('💾 Save request - User:', req.user.id, 'Opportunity:', opportunityId)
+    console.log('💾 ========== SAVE OPPORTUNITY ==========')
+    console.log('💾 User ID:', req.user.id)
+    console.log('💾 Opportunity ID:', opportunityId)
 
     // User MUST have volunteer profile from registration
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
@@ -103,7 +131,7 @@ router.post('/', authenticate, async (req, res) => {
       })
     }
 
-    console.log('✅ Volunteer profile found:', volunteer.id)
+    console.log('✅ Volunteer profile found - Volunteer ID:', volunteer.id)
 
     // Check if opportunity exists and get its organization
     const opportunity = await Opportunity.findByPk(opportunityId, {
@@ -123,7 +151,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     console.log('✅ Opportunity found:', opportunity.title)
-    console.log('📋 Opportunity belongs to org:', opportunity.organization?.name, '(orgId:', opportunity.organizationId, ')')
+    console.log('📋 Opportunity Organization ID:', opportunity.organizationId)
 
     // CRITICAL: Check if user owns an organization
     const userOrganization = await Organization.findOne({
@@ -159,7 +187,7 @@ router.post('/', authenticate, async (req, res) => {
     })
 
     if (existingSave) {
-      console.log('⚠️ Already saved')
+      console.log('⚠️ Already saved - SavedOpportunity ID:', existingSave.id)
       return res.status(400).json({ 
         success: false,
         message: 'Opportunity already saved' 
@@ -172,7 +200,11 @@ router.post('/', authenticate, async (req, res) => {
       volunteerId: volunteer.id
     })
 
-    console.log('✅ Opportunity saved successfully - SavedOpportunity ID:', saved.id)
+    console.log('✅ Opportunity saved successfully')
+    console.log('📦 Created SavedOpportunity ID:', saved.id)
+    console.log('📦 Opportunity ID:', saved.opportunityId)
+    console.log('📦 Volunteer ID:', saved.volunteerId)
+    console.log('💾 ========== END SAVE OPPORTUNITY ==========\n')
 
     res.status(201).json({
       success: true,
@@ -195,7 +227,9 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
   try {
     const { opportunityId } = req.params
 
-    console.log('🗑️ Unsaving opportunity:', opportunityId, 'for user:', req.user.id)
+    console.log('🗑️ ========== UNSAVE OPPORTUNITY ==========')
+    console.log('🗑️ User ID:', req.user.id)
+    console.log('🗑️ Opportunity ID to unsave:', opportunityId)
 
     // Find volunteer profile
     const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
@@ -208,6 +242,8 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
       })
     }
 
+    console.log('✅ Volunteer profile found - Volunteer ID:', volunteer.id)
+
     // Find saved opportunity
     const saved = await SavedOpportunity.findOne({
       where: { 
@@ -217,17 +253,31 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
     })
 
     if (!saved) {
-      console.log('❌ Saved opportunity not found')
+      console.log('❌ SavedOpportunity NOT FOUND in database')
+      console.log('❌ Looking for: opportunityId =', opportunityId, ', volunteerId =', volunteer.id)
+      
+      // Check if this opportunity exists at all for this volunteer
+      const allSaved = await SavedOpportunity.findAll({
+        where: { volunteerId: volunteer.id }
+      })
+      console.log('📊 All saved opportunities for this volunteer:', allSaved.map(s => ({
+        id: s.id,
+        opportunityId: s.opportunityId
+      })))
+      
       return res.status(404).json({ 
         success: false,
         message: 'Saved opportunity not found' 
       })
     }
 
+    console.log('✅ Found SavedOpportunity ID:', saved.id)
+
     // Delete saved opportunity
     await saved.destroy()
 
     console.log('✅ Opportunity unsaved successfully')
+    console.log('🗑️ ========== END UNSAVE OPPORTUNITY ==========\n')
 
     res.json({
       success: true,
@@ -235,6 +285,7 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Unsave opportunity error:', error)
+    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Failed to unsave opportunity', 
