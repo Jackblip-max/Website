@@ -13,47 +13,119 @@ const OpportunityCard = ({ opportunity }) => {
   const { isAuthenticated, user } = useAuth()
   const queryClient = useQueryClient()
   
-  // Check if opportunity is saved
-  const { data: savedStatus } = useQuery({
+  // Check if opportunity is saved - ALWAYS fetch fresh data
+  const { data: savedStatus, refetch: refetchSavedStatus } = useQuery({
     queryKey: ['savedStatus', opportunity.id],
-    queryFn: () => volunteerService.checkIfSaved(opportunity.id),
+    queryFn: async () => {
+      const result = await volunteerService.checkIfSaved(opportunity.id)
+      console.log('🔍 Saved status for opportunity', opportunity.id, ':', result)
+      return result
+    },
     enabled: isAuthenticated && user?.role === 'volunteer',
-    staleTime: 0 // Always fetch fresh data
+    staleTime: 0, // Always fetch fresh
+    cacheTime: 0, // Don't cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   })
 
   const [isSaved, setIsSaved] = useState(false)
 
   // Update isSaved state when savedStatus changes
   useEffect(() => {
+    console.log('📊 SavedStatus changed for opportunity', opportunity.id, ':', savedStatus)
     if (savedStatus?.isSaved !== undefined) {
       setIsSaved(savedStatus.isSaved)
+      console.log('✅ Set isSaved to:', savedStatus.isSaved, 'for opportunity', opportunity.id)
+    } else {
+      setIsSaved(false)
     }
-  }, [savedStatus])
+  }, [savedStatus, opportunity.id])
 
   const saveMutation = useMutation({
-    mutationFn: (oppId) => 
-      isSaved ? volunteerService.unsaveOpportunity(oppId) : volunteerService.saveOpportunity(oppId),
-    onMutate: () => {
-      // Optimistically update UI
-      setIsSaved(!isSaved)
+    mutationFn: (oppId) => {
+      console.log('💾 SAVE mutation called for opportunity:', oppId)
+      return volunteerService.saveOpportunity(oppId)
+    },
+    onMutate: async (oppId) => {
+      console.log('⚡ onMutate - Optimistically setting saved to TRUE for:', oppId)
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries(['savedStatus', oppId])
+      
+      // Snapshot previous value
+      const previousStatus = queryClient.getQueryData(['savedStatus', oppId])
+      
+      // Optimistically update
+      queryClient.setQueryData(['savedStatus', oppId], { isSaved: true })
+      setIsSaved(true)
+      
+      return { previousStatus }
     },
     onSuccess: (data, oppId) => {
-      const message = isSaved ? 'Removed from saved' : 'Saved successfully!'
-      toast.success(message)
+      console.log('✅ SAVE successful for opportunity:', oppId)
+      toast.success('Saved successfully!')
       
-      // Invalidate queries to refresh data
+      // Invalidate and refetch
       queryClient.invalidateQueries(['savedOpportunities'])
       queryClient.invalidateQueries(['savedStatus', oppId])
+      refetchSavedStatus()
     },
-    onError: (error, oppId) => {
-      // Revert optimistic update on error
-      setIsSaved(!isSaved)
+    onError: (error, oppId, context) => {
+      console.error('❌ SAVE failed for opportunity:', oppId, error)
+      
+      // Rollback optimistic update
+      if (context?.previousStatus) {
+        queryClient.setQueryData(['savedStatus', oppId], context.previousStatus)
+        setIsSaved(context.previousStatus?.isSaved || false)
+      } else {
+        setIsSaved(false)
+      }
       
       const message = error.response?.data?.message || 'Failed to save opportunity'
       toast.error(message)
+    }
+  })
+
+  const unsaveMutation = useMutation({
+    mutationFn: (oppId) => {
+      console.log('🗑️ UNSAVE mutation called for opportunity:', oppId)
+      return volunteerService.unsaveOpportunity(oppId)
+    },
+    onMutate: async (oppId) => {
+      console.log('⚡ onMutate - Optimistically setting saved to FALSE for:', oppId)
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries(['savedStatus', oppId])
       
-      // Invalidate to ensure UI is in sync
+      // Snapshot previous value
+      const previousStatus = queryClient.getQueryData(['savedStatus', oppId])
+      
+      // Optimistically update
+      queryClient.setQueryData(['savedStatus', oppId], { isSaved: false })
+      setIsSaved(false)
+      
+      return { previousStatus }
+    },
+    onSuccess: (data, oppId) => {
+      console.log('✅ UNSAVE successful for opportunity:', oppId)
+      toast.success('Removed from saved')
+      
+      // Invalidate and refetch
+      queryClient.invalidateQueries(['savedOpportunities'])
       queryClient.invalidateQueries(['savedStatus', oppId])
+      refetchSavedStatus()
+    },
+    onError: (error, oppId, context) => {
+      console.error('❌ UNSAVE failed for opportunity:', oppId, error)
+      
+      // Rollback optimistic update
+      if (context?.previousStatus) {
+        queryClient.setQueryData(['savedStatus', oppId], context.previousStatus)
+        setIsSaved(context.previousStatus?.isSaved || false)
+      } else {
+        setIsSaved(true)
+      }
+      
+      const message = error.response?.data?.message || 'Failed to remove opportunity'
+      toast.error(message)
     }
   })
 
@@ -72,6 +144,9 @@ const OpportunityCard = ({ opportunity }) => {
   const handleSave = (e) => {
     e.stopPropagation()
     
+    console.log('🔘 Bookmark clicked for opportunity:', opportunity.id)
+    console.log('🔘 Current isSaved state:', isSaved)
+    
     if (!isAuthenticated) {
       toast.error('Please login to save opportunities')
       setTimeout(() => navigate('/login'), 1500)
@@ -83,21 +158,27 @@ const OpportunityCard = ({ opportunity }) => {
       return
     }
     
-    saveMutation.mutate(opportunity.id)
+    // Call the appropriate mutation based on current state
+    if (isSaved) {
+      console.log('▶️ Calling UNSAVE mutation')
+      unsaveMutation.mutate(opportunity.id)
+    } else {
+      console.log('▶️ Calling SAVE mutation')
+      saveMutation.mutate(opportunity.id)
+    }
   }
 
   const handleApply = (e) => {
     e.stopPropagation()
     
     if (!isAuthenticated) {
-      // Show custom toast with register/login options
       toast((toastInstance) => (
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-gray-900 mb-1">Login Required</p>
-              <p className="text-sm text-gray-600">Please create an account or login to apply for volunteer opportunities</p>
+              <p className="text-sm text-gray-600">Please create an account or login to apply</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -106,7 +187,7 @@ const OpportunityCard = ({ opportunity }) => {
                 toast.dismiss(toastInstance.id)
                 navigate('/register')
               }}
-              className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium transition-colors"
+              className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium"
             >
               Create Account
             </button>
@@ -115,7 +196,7 @@ const OpportunityCard = ({ opportunity }) => {
                 toast.dismiss(toastInstance.id)
                 navigate('/login')
               }}
-              className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium transition-colors"
+              className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 font-medium"
             >
               Login
             </button>
@@ -123,10 +204,7 @@ const OpportunityCard = ({ opportunity }) => {
         </div>
       ), {
         duration: 6000,
-        style: {
-          minWidth: '350px',
-          maxWidth: '450px',
-        },
+        style: { minWidth: '350px', maxWidth: '450px' }
       })
       return
     }
@@ -149,6 +227,8 @@ const OpportunityCard = ({ opportunity }) => {
       default: return 'bg-gray-100 text-gray-800'
     }
   }
+
+  const isLoading = saveMutation.isPending || unsaveMutation.isPending
 
   return (
     <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden">
@@ -183,7 +263,7 @@ const OpportunityCard = ({ opportunity }) => {
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800">
-              <span className="font-semibold">Note:</span> You must be registered to apply for opportunities
+              <span className="font-semibold">Note:</span> You must be registered to apply
             </p>
           </div>
         )}
@@ -194,17 +274,16 @@ const OpportunityCard = ({ opportunity }) => {
             disabled={applyMutation.isPending}
             className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
               isAuthenticated
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
                 : 'bg-amber-500 text-white hover:bg-amber-600'
             }`}
-            title={!isAuthenticated ? 'Click to register or login' : 'Apply for this opportunity'}
           >
             {applyMutation.isPending ? 'Applying...' : isAuthenticated ? t('apply') : 'Register to Apply'}
           </button>
           
           <button
             onClick={handleSave}
-            disabled={saveMutation.isPending || !isAuthenticated}
+            disabled={isLoading || !isAuthenticated}
             className={`p-2 rounded-lg border-2 transition-colors ${
               !isAuthenticated
                 ? 'border-gray-200 text-gray-400 cursor-not-allowed'
@@ -212,7 +291,7 @@ const OpportunityCard = ({ opportunity }) => {
                 ? 'bg-emerald-100 border-emerald-600 text-emerald-600'
                 : 'border-gray-300 text-gray-600 hover:border-emerald-600'
             }`}
-            title={!isAuthenticated ? 'Login to save opportunities' : isSaved ? 'Unsave' : 'Save for later'}
+            title={!isAuthenticated ? 'Login to save' : isSaved ? 'Unsave' : 'Save for later'}
           >
             <Bookmark className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} />
           </button>
@@ -220,7 +299,6 @@ const OpportunityCard = ({ opportunity }) => {
           <button
             onClick={handleShare}
             className="p-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:border-emerald-600 transition-colors"
-            title="Share this opportunity"
           >
             <Share2 className="w-5 h-5" />
           </button>
