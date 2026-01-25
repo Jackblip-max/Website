@@ -16,18 +16,31 @@ const SavedOpportunities = () => {
   // Fetch saved opportunities
   const { data: savedData, isLoading, error } = useQuery({
     queryKey: ['savedOpportunities'],
-    queryFn: volunteerService.getSavedOpportunities,
+    queryFn: async () => {
+      console.log('📚 Fetching saved opportunities...')
+      const result = await volunteerService.getSavedOpportunities()
+      console.log('📚 Raw saved data:', result)
+      return result
+    },
     enabled: isAuthenticated && user?.role === 'volunteer'
   })
 
   // Unsave mutation
   const unsaveMutation = useMutation({
-    mutationFn: (opportunityId) => volunteerService.unsaveOpportunity(opportunityId),
+    mutationFn: (opportunityId) => {
+      console.log('🗑️ UNSAVE MUTATION - Opportunity ID:', opportunityId)
+      console.log('🗑️ User ID:', user?.id)
+      console.log('🗑️ Volunteer ID:', user?.volunteer?.id)
+      return volunteerService.unsaveOpportunity(opportunityId)
+    },
     onSuccess: () => {
       toast.success('Removed from saved opportunities')
       queryClient.invalidateQueries(['savedOpportunities'])
+      queryClient.invalidateQueries(['savedStatus'])
     },
     onError: (error) => {
+      console.error('🗑️ UNSAVE ERROR:', error)
+      console.error('🗑️ Error response:', error.response)
       toast.error(error.response?.data?.message || 'Failed to remove opportunity')
     }
   })
@@ -45,10 +58,16 @@ const SavedOpportunities = () => {
     }
   })
 
-  const handleUnsave = (opportunityId, e) => {
+  const handleUnsave = (opportunity, e) => {
     e.stopPropagation()
-    if (window.confirm('Remove this opportunity from saved items?')) {
-      unsaveMutation.mutate(opportunityId)
+    
+    console.log('🗑️ HANDLE UNSAVE CALLED')
+    console.log('🗑️ Full opportunity object:', opportunity)
+    console.log('🗑️ Opportunity ID:', opportunity.id)
+    console.log('🗑️ Opportunity Title:', opportunity.title)
+    
+    if (window.confirm(`Remove "${opportunity.title}" from saved items?`)) {
+      unsaveMutation.mutate(opportunity.id)
     }
   }
 
@@ -143,6 +162,13 @@ const SavedOpportunities = () => {
 
   // Extract opportunities from response
   const savedOpportunities = savedData?.data || savedData || []
+  
+  console.log('📊 SAVED OPPORTUNITIES ARRAY:', savedOpportunities)
+  console.log('📊 Count:', savedOpportunities.length)
+  if (savedOpportunities.length > 0) {
+    console.log('📊 First item structure:', savedOpportunities[0])
+    console.log('📊 All IDs:', savedOpportunities.map(o => ({ id: o.id, title: o.title })))
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -161,69 +187,82 @@ const SavedOpportunities = () => {
         {/* Opportunities Grid */}
         {savedOpportunities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedOpportunities.map((opportunity) => (
-              <div
-                key={opportunity.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden group"
-              >
-                <div className="p-6">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">
-                        {opportunity.title}
-                      </h3>
-                      <p className="text-emerald-600 font-medium mb-1">
-                        {opportunity.organizationName || opportunity.organization?.name}
-                      </p>
-                      <div className="flex items-center text-gray-600 text-sm">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span>{opportunity.location}</span>
+            {savedOpportunities.map((opportunity) => {
+              console.log('🔍 Rendering card for opportunity:', {
+                id: opportunity.id,
+                title: opportunity.title,
+                isSaved: opportunity.isSaved
+              })
+              
+              return (
+                <div
+                  key={opportunity.id}
+                  className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden group"
+                >
+                  <div className="p-6">
+                    {/* Debug Badge */}
+                    <div className="mb-2 text-xs text-gray-500 font-mono">
+                      ID: {opportunity.id}
+                    </div>
+                    
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors">
+                          {opportunity.title}
+                        </h3>
+                        <p className="text-emerald-600 font-medium mb-1">
+                          {opportunity.organizationName || opportunity.organization?.name}
+                        </p>
+                        <div className="flex items-center text-gray-600 text-sm">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          <span>{opportunity.location}</span>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getModeColor(opportunity.mode)}`}>
+                        {t(opportunity.mode)}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                      {opportunity.description}
+                    </p>
+
+                    {/* Details */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <span>Deadline: {new Date(opportunity.deadline).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <span>{opportunity.timeCommitment}</span>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getModeColor(opportunity.mode)}`}>
-                      {t(opportunity.mode)}
-                    </span>
-                  </div>
 
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {opportunity.description}
-                  </p>
-
-                  {/* Details */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <span>Deadline: {new Date(opportunity.deadline).toLocaleDateString()}</span>
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={(e) => handleApply(opportunity.id, e)}
+                        disabled={applyMutation.isPending}
+                        className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {applyMutation.isPending ? 'Applying...' : t('apply')}
+                      </button>
+                      <button
+                        onClick={(e) => handleUnsave(opportunity, e)}
+                        disabled={unsaveMutation.isPending}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Remove from saved"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="w-4 h-4 mr-2" />
-                      <span>{opportunity.timeCommitment}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={(e) => handleApply(opportunity.id, e)}
-                      disabled={applyMutation.isPending}
-                      className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {applyMutation.isPending ? 'Applying...' : t('apply')}
-                    </button>
-                    <button
-                      onClick={(e) => handleUnsave(opportunity.id, e)}
-                      disabled={unsaveMutation.isPending}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Remove from saved"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           // Empty State
