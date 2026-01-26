@@ -6,7 +6,7 @@ import Application from './Application.js'
 import SavedOpportunity from './SavedOpportunity.js'
 import Notification from './Notification.js'
 import AdminLog from './AdminLog.js'
-import Certificate from './Certificate.js'
+import Certificate from './Certificate.js' 
 
 // User - Volunteer (One-to-One)
 User.hasOne(Volunteer, { foreignKey: 'userId', as: 'volunteer' })
@@ -40,6 +40,22 @@ Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' })
 User.hasMany(AdminLog, { foreignKey: 'adminId', as: 'adminLogs' })
 AdminLog.belongsTo(User, { foreignKey: 'adminId', as: 'admin' })
 
+// ⭐ NEW: Certificate Relationships
+Certificate.belongsTo(Application, { foreignKey: 'applicationId', as: 'application' })
+Application.hasOne(Certificate, { foreignKey: 'applicationId', as: 'certificate' })
+
+Certificate.belongsTo(Volunteer, { foreignKey: 'volunteerId', as: 'volunteer' })
+Volunteer.hasMany(Certificate, { foreignKey: 'volunteerId', as: 'certificates' })
+
+Certificate.belongsTo(Opportunity, { foreignKey: 'opportunityId', as: 'opportunity' })
+Opportunity.hasMany(Certificate, { foreignKey: 'opportunityId', as: 'certificates' })
+
+Certificate.belongsTo(Organization, { foreignKey: 'organizationId', as: 'organization' })
+Organization.hasMany(Certificate, { foreignKey: 'organizationId', as: 'certificates' })
+
+Certificate.belongsTo(User, { foreignKey: 'issuedBy', as: 'issuer' })
+User.hasMany(Certificate, { foreignKey: 'issuedBy', as: 'issuedCertificates' })
+
 export {
   User,
   Volunteer,
@@ -48,5 +64,6 @@ export {
   Application,
   SavedOpportunity,
   Notification,
-  AdminLog
+  AdminLog,
+  Certificate  
 }
