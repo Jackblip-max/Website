@@ -5,18 +5,30 @@ import fs from 'fs'
 // Ensure upload directories exist
 const uploadDir = 'uploads'
 const logosDir = path.join(uploadDir, 'logos')
+const signaturesDir = path.join(uploadDir, 'signatures')      // NEW
+const certificatesDir = path.join(uploadDir, 'certificates')  // NEW
 
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
 if (!fs.existsSync(logosDir)) fs.mkdirSync(logosDir)
+if (!fs.existsSync(signaturesDir)) fs.mkdirSync(signaturesDir)           // NEW
+if (!fs.existsSync(certificatesDir)) fs.mkdirSync(certificatesDir)       // NEW
 
 // Configure storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, logosDir)
+    // Determine destination based on fieldname
+    if (file.fieldname === 'signature') {
+      cb(null, signaturesDir)                    // NEW
+    } else if (file.fieldname === 'logo') {
+      cb(null, logosDir)
+    } else {
+      cb(null, uploadDir)
+    }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname))
+    const prefix = file.fieldname === 'signature' ? 'signature-' : 'logo-'  // NEW
+    cb(null, prefix + uniqueSuffix + path.extname(file.originalname))
   }
 })
 
@@ -36,7 +48,7 @@ const fileFilter = (req, file, cb) => {
 export const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: 5 * 1024 * 1024 // 5MB - increased for signatures
   },
   fileFilter
 })
