@@ -488,3 +488,179 @@ export const sendOrganizationRejectionEmail = async (userEmail, userName, organi
   
   return await sendEmail({ to: userEmail, subject, text, html })
 }
+
+export const sendCertificateEmail = async (userEmail, userName, certificateData) => {
+  const { opportunityTitle, organizationName, certificateNumber, verificationCode, certificateUrl, certificateFilePath } = certificateData
+  
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-certificate/${verificationCode}`
+  
+  const subject = `🎓 Your Volunteer Certificate - ${opportunityTitle}`
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+        .certificate-box { background: white; border: 3px solid #10b981; border-radius: 10px; padding: 20px; margin: 20px 0; text-align: center; }
+        .cert-number { font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: #1e40af; margin: 10px 0; }
+        .button { display: inline-block; background: #10b981; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; margin: 10px 0; font-weight: bold; }
+        .info-box { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #6b7280; font-size: 12px; }
+        .achievement-icon { font-size: 64px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="achievement-icon">🎓</div>
+          <h1>Congratulations ${userName}!</h1>
+          <p style="font-size: 18px; margin-top: 10px;">Your Certificate is Ready!</p>
+        </div>
+        
+        <div class="content">
+          <h2 style="color: #1f2937; margin-bottom: 15px;">Certificate of Achievement</h2>
+          
+          <p style="font-size: 16px; color: #374151;">
+            We are thrilled to inform you that your volunteer certificate has been issued by <strong>${organizationName}</strong> 
+            for successfully completing:
+          </p>
+          
+          <div class="certificate-box">
+            <h3 style="color: #10b981; margin-bottom: 10px;">${opportunityTitle}</h3>
+            <div class="cert-number">Certificate No: ${certificateNumber}</div>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">
+              This certificate recognizes your dedication and contribution to making a positive impact in the community.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${certificateUrl}" class="button" style="color: white;">
+              📥 Download Certificate
+            </a>
+          </div>
+          
+          <div class="info-box">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>📋 Certificate Details:</strong>
+            </p>
+            <ul style="margin: 10px 0; padding-left: 20px; color: #1f3a8a;">
+              <li>Certificate Number: <strong>${certificateNumber}</strong></li>
+              <li>Organization: ${organizationName}</li>
+              <li>Opportunity: ${opportunityTitle}</li>
+              <li>Issued: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</li>
+            </ul>
+          </div>
+          
+          <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>🔐 Verify Your Certificate:</strong><br>
+              Your certificate includes a unique QR code and verification code for authenticity. 
+              Anyone can verify it at:
+            </p>
+            <p style="margin: 10px 0;">
+              <a href="${verificationUrl}" style="color: #1e40af; word-break: break-all;">${verificationUrl}</a>
+            </p>
+          </div>
+          
+          <h3 style="color: #1f2937; margin-top: 30px; margin-bottom: 15px;">What's Next?</h3>
+          <ul style="color: #4b5563; line-height: 1.8;">
+            <li>📂 <strong>Save your certificate</strong> in a safe place</li>
+            <li>💼 <strong>Add it to your resume</strong> or LinkedIn profile</li>
+            <li>📱 <strong>Share it on social media</strong> to inspire others</li>
+            <li>🔍 <strong>Use the QR code</strong> to verify authenticity anytime</li>
+            <li>🌟 <strong>Continue volunteering</strong> to earn more certificates!</li>
+          </ul>
+          
+          <p style="margin-top: 30px; color: #374151;">
+            Thank you for your valuable contribution to <strong>${organizationName}</strong> 
+            and for making a difference in our community. We hope to see you volunteering again soon!
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f0fdf4; border-radius: 10px;">
+            <p style="font-size: 18px; font-weight: bold; color: #065f46; margin: 0;">
+              🌟 Keep Making a Difference! 🌟
+            </p>
+            <p style="color: #047857; margin-top: 10px;">
+              Browse more volunteer opportunities at MyanVolunteer
+            </p>
+          </div>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+            If you have any questions about your certificate, please contact ${organizationName} directly 
+            or reach out to our support team.
+          </p>
+          
+          <p style="margin-top: 20px;">
+            Best regards,<br>
+            <strong>The MyanVolunteer Team</strong>
+          </p>
+        </div>
+        
+        <div class="footer">
+          <p>© 2025 MyanVolunteer. All rights reserved.</p>
+          <p>This certificate was issued by ${organizationName}</p>
+          <p style="margin-top: 10px;">
+            <a href="${verificationUrl}" style="color: #6b7280;">Verify Certificate</a> • 
+            <a href="${process.env.FRONTEND_URL}" style="color: #6b7280;">Visit MyanVolunteer</a>
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  
+  const text = `
+    Congratulations ${userName}!
+    
+    Your Certificate is Ready!
+    
+    You have been awarded a certificate by ${organizationName} for successfully completing:
+    ${opportunityTitle}
+    
+    Certificate Number: ${certificateNumber}
+    
+    Download your certificate: ${certificateUrl}
+    
+    Verify your certificate: ${verificationUrl}
+    
+    What's Next?
+    - Save your certificate in a safe place
+    - Add it to your resume or LinkedIn profile
+    - Share it on social media
+    - Continue volunteering to earn more certificates!
+    
+    Thank you for your valuable contribution and for making a difference!
+    
+    Best regards,
+    The MyanVolunteer Team
+  `
+  
+  try {
+    // Prepare email with attachment
+    const mailOptions = {
+      from: `"MyanVolunteer" <${process.env.SMTP_USER}>`,
+      to: userEmail,
+      subject,
+      text,
+      html,
+      attachments: [
+        {
+          filename: `Certificate_${certificateNumber}.jpg`,
+          path: certificateFilePath
+        }
+      ]
+    }
+
+    console.log('📧 Sending certificate email to:', userEmail)
+    const info = await transporter.sendMail(mailOptions)
+    console.log('✅ Certificate email sent:', info.messageId)
+    return info
+  } catch (error) {
+    console.error('❌ Certificate email error:', error)
+    throw new Error(`Failed to send certificate email: ${error.message}`)
+  }
+}
