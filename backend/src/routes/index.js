@@ -6,6 +6,7 @@ import applicationRoutes from './applicationRoutes.js'
 import savedRoutes from './savedRoutes.js'
 import adminRoutes from './adminRoutes.js'
 import aiRoutes from './aiRoutes.js'
+import certificateRoutes from './certificateRoutes.js'
 
 const router = express.Router()
 
@@ -15,6 +16,7 @@ router.use('/organizations', organizationRoutes)
 router.use('/applications', applicationRoutes)
 router.use('/saved', savedRoutes)
 router.use('/admin', adminRoutes)
-router.use('/ai', aiRoutes) 
+router.use('/ai', aiRoutes)
+router.use('/certificates', certificateRoutes) 
 
 export default router
