@@ -261,3 +261,143 @@ export const getOrganizationOpportunities = async (req, res) => {
     })
   }
 }
+
+/**
+ * Upload organization signature
+ */
+export const uploadSignature = async (req, res) => {
+  try {
+    console.log('📝 Signature upload request received')
+    console.log('File:', req.file)
+
+    if (!req.file) {
+      console.log('❌ No file uploaded')
+      return res.status(400).json({ 
+        success: false,
+        message: 'No signature file uploaded' 
+      })
+    }
+
+    // Find organization
+    const organization = await Organization.findOne({ 
+      where: { userId: req.user.id } 
+    })
+    
+    if (!organization) {
+      console.log('❌ Organization not found for user:', req.user.id)
+      return res.status(404).json({ 
+        success: false,
+        message: 'Organization not found' 
+      })
+    }
+
+    // Update signature path
+    const signaturePath = `/uploads/signatures/${req.file.filename}`
+    await organization.update({ signatureUrl: signaturePath })
+
+    console.log('✅ Signature uploaded successfully:', signaturePath)
+
+    res.json({
+      success: true,
+      message: 'Signature uploaded successfully',
+      data: {
+        signatureUrl: signaturePath,
+        filename: req.file.filename
+      }
+    })
+  } catch (error) {
+    console.error('❌ Upload signature error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to upload signature', 
+      error: error.message 
+    })
+  }
+}
+
+/**
+ * Update signatory information (text signature)
+ */
+export const updateSignatory = async (req, res) => {
+  try {
+    const { signatoryName, signatoryTitle } = req.body
+
+    if (!signatoryName || !signatoryTitle) {
+      return res.status(400).json({
+        success: false,
+        message: 'Signatory name and title are required'
+      })
+    }
+
+    // Find organization
+    const organization = await Organization.findOne({ 
+      where: { userId: req.user.id } 
+    })
+    
+    if (!organization) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Organization not found' 
+      })
+    }
+
+    // Update signatory info
+    await organization.update({ 
+      signatoryName: signatoryName.trim(),
+      signatoryTitle: signatoryTitle.trim()
+    })
+
+    console.log('✅ Signatory info updated:', { signatoryName, signatoryTitle })
+
+    res.json({
+      success: true,
+      message: 'Signatory information updated successfully',
+      data: {
+        signatoryName: organization.signatoryName,
+        signatoryTitle: organization.signatoryTitle
+      }
+    })
+  } catch (error) {
+    console.error('❌ Update signatory error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to update signatory information', 
+      error: error.message 
+    })
+  }
+}
+
+/**
+ * Remove signature (switch to text signature)
+ */
+export const removeSignature = async (req, res) => {
+  try {
+    const organization = await Organization.findOne({ 
+      where: { userId: req.user.id } 
+    })
+    
+    if (!organization) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Organization not found' 
+      })
+    }
+
+    // Remove signature URL
+    await organization.update({ signatureUrl: null })
+
+    console.log('✅ Signature removed for organization:', organization.id)
+
+    res.json({
+      success: true,
+      message: 'Signature removed successfully'
+    })
+  } catch (error) {
+    console.error('❌ Remove signature error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to remove signature', 
+      error: error.message 
+    })
+  }
+}
