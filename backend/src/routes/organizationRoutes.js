@@ -5,7 +5,10 @@ import {
   updateOrganization, 
   uploadLogo,
   getOrganizationStats,
-  getOrganizationOpportunities
+  getOrganizationOpportunities,
+  uploadSignature,     
+  updateSignatory,      
+  removeSignature       
 } from '../controllers/organizationController.js'
 import { authenticate } from '../middleware/auth.js'
 import { upload } from '../middleware/upload.js'
@@ -29,5 +32,10 @@ router.put('/:id', authenticate, updateOrganization)
 
 // Upload logo
 router.post('/logo', authenticate, upload.single('logo'), uploadLogo)
+
+// NEW: Signature management routes
+router.post('/signature', authenticate, upload.single('signature'), uploadSignature)
+router.put('/signatory', authenticate, updateSignatory)
+router.delete('/signature', authenticate, removeSignature)
 
 export default router
