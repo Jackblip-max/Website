@@ -6,6 +6,7 @@ import Application from './Application.js'
 import SavedOpportunity from './SavedOpportunity.js'
 import Notification from './Notification.js'
 import AdminLog from './AdminLog.js'
+import Certificate from './Certificate.js'
 
 // User - Volunteer (One-to-One)
 User.hasOne(Volunteer, { foreignKey: 'userId', as: 'volunteer' })
