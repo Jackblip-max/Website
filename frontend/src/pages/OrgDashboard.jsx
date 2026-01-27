@@ -1,15 +1,22 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, AlertCircle, Edit, Clock } from 'lucide-react'
+import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, AlertCircle, Edit, Clock, Award } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
 import { organizationService } from '../services/organizationService'
 import Loader from '../components/common/Loader'
+import CertificateModal from '../components/certificates/CertificateModal'
 
 const OrgDashboard = () => {
   const { t } = useLanguage()
   const queryClient = useQueryClient()
+  
+  // ⭐ Modal state
+  const [certificateModal, setCertificateModal] = useState({
+    isOpen: false,
+    applicant: null
+  })
 
   // Fetch organization details
   const { data: organization, isLoading: orgLoading } = useQuery({
@@ -135,6 +142,48 @@ const OrgDashboard = () => {
     }
   })
 
+  // ⭐ Certificate generation mutation
+  const certificateMutation = useMutation({
+    mutationFn: async (data) => {
+      return await organizationService.generateCertificate(data)
+    },
+    onSuccess: () => {
+      toast.success('✅ Certificate generated and sent to volunteer!')
+      setCertificateModal({ isOpen: false, applicant: null })
+      queryClient.invalidateQueries(['applicants'])
+    },
+    onError: (error) => {
+      const message = error.response?.data?.message || 'Failed to generate certificate'
+      toast.error(message)
+    }
+  })
+
+  // ⭐ Open certificate modal
+  const handleOpenCertificateModal = (applicant) => {
+    setCertificateModal({
+      isOpen: true,
+      applicant
+    })
+  }
+
+  // ⭐ Close certificate modal
+  const handleCloseCertificateModal = () => {
+    if (!certificateMutation.isPending) {
+      setCertificateModal({
+        isOpen: false,
+        applicant: null
+      })
+    }
+  }
+
+  // ⭐ Submit certificate form
+  const handleSubmitCertificate = (formData) => {
+    certificateMutation.mutate({
+      applicationId: certificateModal.applicant.id,
+      ...formData
+    })
+  }
+
   // Show loading state
   if (statsLoading || oppsLoading || orgLoading) {
     return (
@@ -175,7 +224,6 @@ const OrgDashboard = () => {
                     onError={(e) => {
                       console.error('Logo failed to load:', logoUrl)
                       e.target.onerror = null
-                      // Fallback to initial
                       e.target.style.display = 'none'
                       e.target.nextSibling.style.display = 'flex'
                     }}
@@ -379,10 +427,20 @@ const OrgDashboard = () => {
                           </div>
                         )}
                         {applicant.status === 'accepted' && (
-                          <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium inline-flex items-center gap-1">
-                            <Check className="w-4 h-4" />
-                            {t('accepted')}
-                          </span>
+                          <div className="flex flex-col gap-2">
+                            <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium inline-flex items-center gap-1">
+                              <Check className="w-4 h-4" />
+                              {t('accepted')}
+                            </span>
+                            {/* ⭐ Issue Certificate Button */}
+                            <button
+                              onClick={() => handleOpenCertificateModal(applicant)}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-1 transition-colors text-sm font-medium"
+                            >
+                              <Award className="w-4 h-4" />
+                              <span>Issue Certificate</span>
+                            </button>
+                          </div>
                         )}
                         {applicant.status === 'rejected' && (
                           <span className="px-4 py-2 bg-red-100 text-red-800 rounded-lg font-medium inline-flex items-center gap-1">
@@ -410,6 +468,15 @@ const OrgDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* ⭐ Certificate Modal */}
+      <CertificateModal
+        isOpen={certificateModal.isOpen}
+        onClose={handleCloseCertificateModal}
+        applicant={certificateModal.applicant}
+        onSubmit={handleSubmitCertificate}
+        isLoading={certificateMutation.isPending}
+      />
     </div>
   )
 }
