@@ -1,39 +1,43 @@
 import express from 'express'
-import {
+import { protect, authorizeRoles } from '../middleware/authMiddleware.js'
+import { 
   generateCertificate,
-  getCertificateById,
-  getMyVolunteerCertificates,
-  getMyOrganizationCertificates,
+  getCertificate,
   verifyCertificate,
-  resendCertificateEmail,
-  checkCertificateExists
+  getCertificatesByVolunteer,
+  getCertificatesByOrganization
 } from '../controllers/certificateController.js'
-import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// Public routes
-router.get('/verify/:verificationCode', verifyCertificate)
-
-// Protected routes (require authentication)
-router.use(authenticate)
-
 // Generate certificate (Organization only)
-router.post('/generate/:applicationId', generateCertificate)
+router.post(
+  '/generate/:applicationId',
+  protect,
+  authorizeRoles('organization'),
+  generateCertificate
+)
 
-// Get single certificate
-router.get('/:id', getCertificateById)
+// Get specific certificate
+router.get('/:id', getCertificate)
 
-// Get my certificates (Volunteer)
-router.get('/volunteer/my', getMyVolunteerCertificates)
+// Verify certificate by QR code
+router.get('/verify/:qrCode', verifyCertificate)
 
-// Get certificates issued by my organization (Organization)
-router.get('/organization/my', getMyOrganizationCertificates)
+// Get all certificates for a volunteer
+router.get(
+  '/volunteer/my-certificates',
+  protect,
+  authorizeRoles('volunteer'),
+  getCertificatesByVolunteer
+)
 
-// Resend certificate email (Organization)
-router.post('/:id/resend', resendCertificateEmail)
-
-// Check if certificate exists for application (Organization)
-router.get('/check/:applicationId', checkCertificateExists)
+// Get all certificates issued by an organization
+router.get(
+  '/organization/issued',
+  protect,
+  authorizeRoles('organization'),
+  getCertificatesByOrganization
+)
 
 export default router
