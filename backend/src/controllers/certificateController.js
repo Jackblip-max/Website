@@ -1,58 +1,48 @@
 import { Certificate, Application, Opportunity, Volunteer, Organization, User } from '../models/index.js'
-import certificateService from '../services/certificateService.js'
-import { sendCertificateEmail } from '../services/emailService.js'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import CertificateService from '../services/certificateService.js'
+import emailService from '../services/emailService.js'
+import { Op } from 'sequelize'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-/**
- * @desc    Generate and issue certificate
- * @route   POST /api/certificates/generate/:applicationId
- * @access  Private (Organization)
- */
+// @desc    Generate certificate for accepted volunteer
+// @route   POST /api/certificates/generate/:applicationId
+// @access  Private (Organization only)
 export const generateCertificate = async (req, res) => {
   try {
     const { applicationId } = req.params
-    const { completionDate, hoursContributed, customMessage } = req.body
+    const { hoursContributed, completionDate, customMessage } = req.body
+    const organizationId = req.user.organizationId
 
-    console.log('🎓 Generate certificate request:', { applicationId, completionDate, hoursContributed })
+    console.log('📋 Generating certificate request:')
+    console.log('Application ID:', applicationId)
+    console.log('Organization ID:', organizationId)
+    console.log('Hours:', hoursContributed)
+    console.log('Date:', completionDate)
 
-    // Validation
-    if (!completionDate || !hoursContributed) {
+    // Validate required fields
+    if (!hoursContributed || !completionDate) {
       return res.status(400).json({
         success: false,
-        message: 'Completion date and hours contributed are required'
+        message: 'Hours contributed and completion date are required'
       })
     }
 
-    if (hoursContributed < 1 || hoursContributed > 1000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Hours contributed must be between 1 and 1000'
-      })
-    }
-
-    // Find application with all related data
+    // Get application with all related data
     const application = await Application.findByPk(applicationId, {
       include: [
-        {
-          model: Volunteer,
-          as: 'volunteer',
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['id', 'name', 'email']
-          }]
-        },
         {
           model: Opportunity,
           as: 'opportunity',
           include: [{
             model: Organization,
-            as: 'organization',
-            attributes: ['id', 'name', 'logo', 'signatoryName', 'signatoryTitle', 'signatureUrl']
+            as: 'organization'
+          }]
+        },
+        {
+          model: Volunteer,
+          as: 'volunteer',
+          include: [{
+            model: User,
+            as: 'user'
           }]
         }
       ]
@@ -65,161 +55,158 @@ export const generateCertificate = async (req, res) => {
       })
     }
 
-    // Verify application is accepted
-    if (application.status !== 'accepted') {
-      return res.status(400).json({
-        success: false,
-        message: 'Can only issue certificates for accepted applications'
-      })
-    }
+    console.log('✅ Application found:', {
+      id: application.id,
+      status: application.status,
+      opportunityOrgId: application.opportunity?.organization?.id,
+      requestingOrgId: organizationId
+    })
 
-    // Verify organization ownership
-    if (application.opportunity.organization.userId !== req.user.id) {
+    // CRITICAL: Check if the organization owns this opportunity/application
+    if (application.opportunity.organization.id !== organizationId) {
+      console.log('❌ Authorization failed: Organization does not own this application')
       return res.status(403).json({
         success: false,
         message: 'Not authorized to issue certificate for this application'
       })
     }
 
-    // Check if certificate already exists
-    const existingCert = await Certificate.findOne({
-      where: { applicationId }
-    })
-
-    if (existingCert) {
+    // Check if application is accepted
+    if (application.status !== 'accepted') {
       return res.status(400).json({
         success: false,
-        message: 'Certificate already issued for this application',
-        certificateId: existingCert.id
+        message: 'Certificate can only be generated for accepted applications'
       })
     }
 
-    // Generate certificate number and verification code
-    const certificateNumber = certificateService.generateCertificateNumber()
-    const verificationCode = certificateService.generateVerificationCode()
-
-    console.log('📋 Certificate details:', { certificateNumber, verificationCode })
-
-    // Prepare certificate data
-    const organization = application.opportunity.organization
-    const logoPath = organization.logo 
-      ? path.join(__dirname, '../../', organization.logo)
-      : null
-
-    const certificateData = {
-      volunteerName: application.volunteer.user.name,
-      opportunityTitle: application.opportunity.title,
-      organizationName: organization.name,
-      organizationLogo: logoPath,
-      completionDate,
-      hoursContributed,
-      location: application.opportunity.location,
-      certificateNumber,
-      verificationCode,
-      signatoryName: organization.signatoryName || 'Organization Representative',
-      signatoryTitle: organization.signatoryTitle || 'Director',
-      signatureUrl: organization.signatureUrl 
-        ? path.join(__dirname, '../../', organization.signatureUrl)
-        : null
-    }
-
-    console.log('🎨 Generating certificate image...')
-
-    // Generate certificate image
-    const certificateFile = await certificateService.generateCertificate(certificateData)
-
-    console.log('✅ Certificate image generated:', certificateFile.url)
-
-    // Save certificate record to database
-    const certificate = await Certificate.create({
-      applicationId,
-      opportunityId: application.opportunityId,
-      volunteerId: application.volunteerId,
-      organizationId: organization.id,
-      certificateUrl: certificateFile.url,
-      certificateNumber,
-      verificationCode,
-      completionDate,
-      hoursContributed,
-      customMessage: customMessage || null,
-      issuedBy: req.user.id
+    // Check if certificate already exists
+    const existingCertificate = await Certificate.findOne({
+      where: { applicationId }
     })
 
-    console.log('💾 Certificate record saved to database')
+    if (existingCertificate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Certificate already exists for this application',
+        certificate: existingCertificate
+      })
+    }
+
+    // Get organization details for certificate
+    const organization = application.opportunity.organization
+
+    // Generate certificate using service
+    const certificateData = {
+      volunteerName: application.volunteer.user.name,
+      organizationName: organization.name,
+      organizationLogo: organization.logo,
+      opportunityTitle: application.opportunity.title,
+      hoursContributed,
+      completionDate,
+      customMessage,
+      signatoryName: organization.signatoryName,
+      signatoryTitle: organization.signatoryTitle,
+      signatureUrl: organization.signatureUrl
+    }
+
+    console.log('🎨 Generating certificate with data:', certificateData)
+
+    const certificateBuffer = await CertificateService.generateCertificate(certificateData)
+    
+    // Generate unique certificate number
+    const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    
+    // Generate QR code data
+    const qrCode = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-certificate/${certificateNumber}`
+
+    // Save certificate to database
+    const certificate = await Certificate.create({
+      certificateNumber,
+      applicationId,
+      volunteerId: application.volunteerId,
+      opportunityId: application.opportunityId,
+      organizationId,
+      hoursContributed,
+      completionDate,
+      customMessage,
+      qrCode,
+      issuedDate: new Date(),
+      certificateUrl: `/uploads/certificates/${certificateNumber}.pdf`
+    })
+
+    console.log('✅ Certificate saved to database:', certificate.id)
+
+    // Save certificate file
+    const fs = await import('fs')
+    const path = await import('path')
+    
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'certificates')
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true })
+    }
+    
+    const filePath = path.join(uploadsDir, `${certificateNumber}.pdf`)
+    fs.writeFileSync(filePath, certificateBuffer)
+
+    console.log('✅ Certificate file saved:', filePath)
 
     // Send certificate via email
     try {
-      const fullCertificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}${certificateFile.url}`
-      const certificateFilePath = certificateFile.filepath
-
-      await sendCertificateEmail(
-        application.volunteer.user.email,
-        application.volunteer.user.name,
-        {
-          opportunityTitle: application.opportunity.title,
-          organizationName: organization.name,
-          certificateNumber,
-          verificationCode,
-          certificateUrl: fullCertificateUrl,
-          certificateFilePath
-        }
-      )
-
-      console.log('📧 Certificate email sent successfully')
+      await emailService.sendCertificateEmail({
+        to: application.volunteer.user.email,
+        volunteerName: application.volunteer.user.name,
+        certificateNumber,
+        organizationName: organization.name,
+        opportunityTitle: application.opportunity.title,
+        certificateBuffer
+      })
+      console.log('✅ Certificate email sent')
     } catch (emailError) {
-      console.error('⚠️ Failed to send certificate email:', emailError)
-      // Don't fail the request if email fails
+      console.error('❌ Error sending certificate email:', emailError)
+      // Don't fail the whole request if email fails
     }
 
     res.status(201).json({
       success: true,
-      message: 'Certificate generated and sent successfully!',
-      data: {
+      message: 'Certificate generated and sent successfully',
+      certificate: {
         id: certificate.id,
         certificateNumber: certificate.certificateNumber,
+        qrCode: certificate.qrCode,
         certificateUrl: certificate.certificateUrl,
-        verificationCode: certificate.verificationCode
+        issuedDate: certificate.issuedDate
       }
     })
+
   } catch (error) {
-    console.error('❌ Generate certificate error:', error)
+    console.error('❌ Error generating certificate:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to generate certificate',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Error generating certificate',
+      error: error.message
     })
   }
 }
 
-/**
- * @desc    Get certificate by ID
- * @route   GET /api/certificates/:id
- * @access  Private
- */
-export const getCertificateById = async (req, res) => {
+// @desc    Get certificate by ID
+// @route   GET /api/certificates/:id
+// @access  Public
+export const getCertificate = async (req, res) => {
   try {
-    const { id } = req.params
-
-    const certificate = await Certificate.findByPk(id, {
+    const certificate = await Certificate.findByPk(req.params.id, {
       include: [
         {
           model: Volunteer,
           as: 'volunteer',
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['id', 'name', 'email']
-          }]
+          include: [{ model: User, as: 'user' }]
         },
         {
           model: Opportunity,
-          as: 'opportunity',
-          attributes: ['id', 'title']
+          as: 'opportunity'
         },
         {
           model: Organization,
-          as: 'organization',
-          attributes: ['id', 'name', 'logo']
+          as: 'organization'
         }
       ]
     })
@@ -231,163 +218,39 @@ export const getCertificateById = async (req, res) => {
       })
     }
 
-    // Check authorization
-    const isVolunteer = certificate.volunteer.userId === req.user.id
-    const isOrganization = certificate.organization.userId === req.user.id
-
-    if (!isVolunteer && !isOrganization && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to view this certificate'
-      })
-    }
-
     res.json({
       success: true,
-      data: certificate
+      certificate
     })
   } catch (error) {
-    console.error('Get certificate error:', error)
+    console.error('Error fetching certificate:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to get certificate',
-      error: error.message
+      message: 'Error fetching certificate'
     })
   }
 }
 
-/**
- * @desc    Get certificates for a volunteer
- * @route   GET /api/certificates/volunteer/my
- * @access  Private (Volunteer)
- */
-export const getMyVolunteerCertificates = async (req, res) => {
-  try {
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
-
-    if (!volunteer) {
-      return res.json({
-        success: true,
-        data: [],
-        count: 0
-      })
-    }
-
-    const certificates = await Certificate.findAll({
-      where: { volunteerId: volunteer.id },
-      include: [
-        {
-          model: Opportunity,
-          as: 'opportunity',
-          attributes: ['id', 'title', 'category']
-        },
-        {
-          model: Organization,
-          as: 'organization',
-          attributes: ['id', 'name', 'logo']
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    })
-
-    res.json({
-      success: true,
-      data: certificates,
-      count: certificates.length
-    })
-  } catch (error) {
-    console.error('Get volunteer certificates error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get certificates',
-      error: error.message
-    })
-  }
-}
-
-/**
- * @desc    Get certificates issued by organization
- * @route   GET /api/certificates/organization/my
- * @access  Private (Organization)
- */
-export const getMyOrganizationCertificates = async (req, res) => {
-  try {
-    const organization = await Organization.findOne({ where: { userId: req.user.id } })
-
-    if (!organization) {
-      return res.json({
-        success: true,
-        data: [],
-        count: 0
-      })
-    }
-
-    const certificates = await Certificate.findAll({
-      where: { organizationId: organization.id },
-      include: [
-        {
-          model: Volunteer,
-          as: 'volunteer',
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['id', 'name', 'email']
-          }]
-        },
-        {
-          model: Opportunity,
-          as: 'opportunity',
-          attributes: ['id', 'title']
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    })
-
-    res.json({
-      success: true,
-      data: certificates,
-      count: certificates.length
-    })
-  } catch (error) {
-    console.error('Get organization certificates error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get certificates',
-      error: error.message
-    })
-  }
-}
-
-/**
- * @desc    Verify certificate by verification code
- * @route   GET /api/certificates/verify/:verificationCode
- * @access  Public
- */
+// @desc    Verify certificate by QR code
+// @route   GET /api/certificates/verify/:qrCode
+// @access  Public
 export const verifyCertificate = async (req, res) => {
   try {
-    const { verificationCode } = req.params
-
     const certificate = await Certificate.findOne({
-      where: { verificationCode },
+      where: { qrCode: { [Op.like]: `%${req.params.qrCode}%` } },
       include: [
         {
           model: Volunteer,
           as: 'volunteer',
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['name']
-          }]
+          include: [{ model: User, as: 'user' }]
         },
         {
           model: Opportunity,
-          as: 'opportunity',
-          attributes: ['title']
+          as: 'opportunity'
         },
         {
           model: Organization,
-          as: 'organization',
-          attributes: ['name', 'logo']
+          as: 'organization'
         }
       ]
     })
@@ -395,138 +258,101 @@ export const verifyCertificate = async (req, res) => {
     if (!certificate) {
       return res.status(404).json({
         success: false,
-        message: 'Certificate not found or invalid verification code'
+        message: 'Certificate not found or invalid'
       })
     }
 
     res.json({
       success: true,
       valid: true,
-      data: {
+      certificate: {
         certificateNumber: certificate.certificateNumber,
         volunteerName: certificate.volunteer.user.name,
-        opportunityTitle: certificate.opportunity.title,
         organizationName: certificate.organization.name,
-        organizationLogo: certificate.organization.logo,
-        completionDate: certificate.completionDate,
+        opportunityTitle: certificate.opportunity.title,
         hoursContributed: certificate.hoursContributed,
-        issuedDate: certificate.createdAt
+        completionDate: certificate.completionDate,
+        issuedDate: certificate.issuedDate
       }
     })
   } catch (error) {
-    console.error('Verify certificate error:', error)
+    console.error('Error verifying certificate:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to verify certificate',
-      error: error.message
+      message: 'Error verifying certificate'
     })
   }
 }
 
-/**
- * @desc    Resend certificate email
- * @route   POST /api/certificates/:id/resend
- * @access  Private (Organization)
- */
-export const resendCertificateEmail = async (req, res) => {
+// @desc    Get all certificates for a volunteer
+// @route   GET /api/certificates/volunteer/my-certificates
+// @access  Private (Volunteer only)
+export const getCertificatesByVolunteer = async (req, res) => {
   try {
-    const { id } = req.params
+    const volunteerId = req.user.volunteerId
 
-    const certificate = await Certificate.findByPk(id, {
+    const certificates = await Certificate.findAll({
+      where: { volunteerId },
+      include: [
+        {
+          model: Opportunity,
+          as: 'opportunity'
+        },
+        {
+          model: Organization,
+          as: 'organization'
+        }
+      ],
+      order: [['issuedDate', 'DESC']]
+    })
+
+    res.json({
+      success: true,
+      count: certificates.length,
+      certificates
+    })
+  } catch (error) {
+    console.error('Error fetching volunteer certificates:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificates'
+    })
+  }
+}
+
+// @desc    Get all certificates issued by an organization
+// @route   GET /api/certificates/organization/issued
+// @access  Private (Organization only)
+export const getCertificatesByOrganization = async (req, res) => {
+  try {
+    const organizationId = req.user.organizationId
+
+    const certificates = await Certificate.findAll({
+      where: { organizationId },
       include: [
         {
           model: Volunteer,
           as: 'volunteer',
-          include: [{
-            model: User,
-            as: 'user',
-            attributes: ['name', 'email']
-          }]
+          include: [{ model: User, as: 'user' }]
         },
         {
           model: Opportunity,
-          as: 'opportunity',
-          attributes: ['title']
-        },
-        {
-          model: Organization,
-          as: 'organization',
-          attributes: ['id', 'userId', 'name']
+          as: 'opportunity'
         }
-      ]
-    })
-
-    if (!certificate) {
-      return res.status(404).json({
-        success: false,
-        message: 'Certificate not found'
-      })
-    }
-
-    // Verify organization ownership
-    if (certificate.organization.userId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized'
-      })
-    }
-
-    // Resend email
-    const fullCertificateUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}${certificate.certificateUrl}`
-    const certificateFilePath = path.join(__dirname, '../../', certificate.certificateUrl)
-
-    await sendCertificateEmail(
-      certificate.volunteer.user.email,
-      certificate.volunteer.user.name,
-      {
-        opportunityTitle: certificate.opportunity.title,
-        organizationName: certificate.organization.name,
-        certificateNumber: certificate.certificateNumber,
-        verificationCode: certificate.verificationCode,
-        certificateUrl: fullCertificateUrl,
-        certificateFilePath
-      }
-    )
-
-    res.json({
-      success: true,
-      message: 'Certificate email resent successfully'
-    })
-  } catch (error) {
-    console.error('Resend certificate email error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Failed to resend certificate email',
-      error: error.message
-    })
-  }
-}
-
-/**
- * @desc    Check if certificate exists for application
- * @route   GET /api/certificates/check/:applicationId
- * @access  Private (Organization)
- */
-export const checkCertificateExists = async (req, res) => {
-  try {
-    const { applicationId } = req.params
-
-    const certificate = await Certificate.findOne({
-      where: { applicationId },
-      attributes: ['id', 'certificateNumber', 'createdAt']
+      ],
+      order: [['issuedDate', 'DESC']]
     })
 
     res.json({
       success: true,
-      exists: !!certificate,
-      certificate: certificate || null
+      count: certificates.length,
+      certificates
     })
   } catch (error) {
-    console.error('Check certificate error:', error)
+    console.error('Error fetching organization certificates:', error)
     res.status(500).json({
       success: false,
-      message: 'Failed to check certificate',
-      error: error.message
+      message: 'Error fetching certificates'
     })
   }
 }
