@@ -51,5 +51,13 @@ export const organizationService = {
 
   getOrganizationStats: async () => {
     return await api.get('/organizations/stats')
+  },
+
+  generateCertificate: async ({ applicationId, hoursContributed, completionDate, customMessage }) => {
+    return await api.post(`/certificates/generate/${applicationId}`, {
+      hoursContributed,
+      completionDate,
+      customMessage
+    })
   }
 }
