@@ -85,7 +85,6 @@ router.get('/', authenticate, async (req, res) => {
     }).filter(Boolean) // Remove any null entries
 
     console.log('📤 Sending response with', formattedData.length, 'opportunities')
-    console.log('📤 Response data:', JSON.stringify(formattedData, null, 2))
     console.log('📚 ========== END GET SAVED OPPORTUNITIES ==========\n')
 
     res.json({
@@ -152,28 +151,24 @@ router.post('/', authenticate, async (req, res) => {
 
     console.log('✅ Opportunity found:', opportunity.title)
     console.log('📋 Opportunity Organization ID:', opportunity.organizationId)
+    console.log('📋 Opportunity Organization User ID:', opportunity.organization?.userId)
 
-    // CRITICAL: Check if user owns an organization
+    // ⭐ CRITICAL FIX: Check if user owns the organization that posted this opportunity
     const userOrganization = await Organization.findOne({
       where: { userId: req.user.id }
     })
 
     if (userOrganization) {
       console.log('🏢 User has organization:', userOrganization.name, '(id:', userOrganization.id, ')')
-    } else {
-      console.log('👤 User has NO organization')
-    }
-
-    // ONLY prevent saving if:
-    // 1. User HAS an organization (userOrganization exists)
-    // AND
-    // 2. The opportunity belongs to THEIR organization
-    if (userOrganization && opportunity.organizationId === userOrganization.id) {
-      console.log('❌ BLOCKED: User trying to save their own organization\'s opportunity')
-      return res.status(400).json({ 
-        success: false,
-        message: 'You cannot save opportunities from your own organization' 
-      })
+      
+      // Check if this opportunity belongs to the user's organization
+      if (opportunity.organizationId === userOrganization.id) {
+        console.log('❌ BLOCKED: User trying to save their own organization\'s opportunity')
+        return res.status(403).json({ 
+          success: false,
+          message: 'You cannot save opportunities from your own organization' 
+        })
+      }
     }
 
     console.log('✅ Ownership check passed - user can save this opportunity')
@@ -202,8 +197,6 @@ router.post('/', authenticate, async (req, res) => {
 
     console.log('✅ Opportunity saved successfully')
     console.log('📦 Created SavedOpportunity ID:', saved.id)
-    console.log('📦 Opportunity ID:', saved.opportunityId)
-    console.log('📦 Volunteer ID:', saved.volunteerId)
     console.log('💾 ========== END SAVE OPPORTUNITY ==========\n')
 
     res.status(201).json({
