@@ -21,8 +21,14 @@ export const createApplication = async (req, res) => {
 
     console.log('✅ Volunteer profile found:', volunteer.id)
 
-    // Check if opportunity exists and is active
-    const opportunity = await Opportunity.findByPk(opportunityId)
+    // Check if opportunity exists and is active - INCLUDE ORGANIZATION
+    const opportunity = await Opportunity.findByPk(opportunityId, {
+      include: [{
+        model: Organization,
+        as: 'organization',
+        attributes: ['id', 'userId', 'name']
+      }]
+    })
     
     if (!opportunity) {
       console.log('❌ Opportunity not found:', opportunityId)
@@ -33,6 +39,31 @@ export const createApplication = async (req, res) => {
     }
 
     console.log('✅ Opportunity found:', opportunity.title)
+    console.log('📋 Opportunity Organization:', {
+      id: opportunity.organization?.id,
+      userId: opportunity.organization?.userId,
+      name: opportunity.organization?.name
+    })
+    
+    // ⭐ CRITICAL FIX: Check if user owns the organization that posted this opportunity
+    const userOrganization = await Organization.findOne({
+      where: { userId: req.user.id }
+    })
+
+    if (userOrganization) {
+      console.log('🏢 User has organization:', userOrganization.name, '(id:', userOrganization.id, ')')
+      
+      // Check if this opportunity belongs to the user's organization
+      if (opportunity.organizationId === userOrganization.id) {
+        console.log('❌ BLOCKED: User trying to apply to their own organization\'s opportunity')
+        return res.status(403).json({ 
+          success: false,
+          message: 'You cannot apply to opportunities from your own organization' 
+        })
+      }
+    }
+
+    console.log('✅ Ownership check passed - user can apply to this opportunity')
     
     if (opportunity.status !== 'active') {
       console.log('❌ Opportunity is not active. Status:', opportunity.status)
