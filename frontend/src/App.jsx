@@ -2,8 +2,11 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
+
+// Import the new ProtectedRoute
+import ProtectedRoute from './components/ProtectedRoute'
 
 // Layouts
 import MainLayout from './layouts/MainLayout'
@@ -48,29 +51,6 @@ const queryClient = new QueryClient({
   },
 })
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requireAdmin = false }) => {
-  const { user, loading, isAuthenticated } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (requireAdmin && user?.role !== 'admin') {
-    return <Navigate to="/" replace />
-  }
-
-  return children
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -87,7 +67,7 @@ function App() {
                 <Route 
                   path="/admin" 
                   element={
-                    <ProtectedRoute requireAdmin>
+                    <ProtectedRoute>
                       <AdminDashboard />
                     </ProtectedRoute>
                   } 
@@ -114,7 +94,7 @@ function App() {
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/contact" element={<Contact />} />
                 
-                {/* Protected User Routes */}
+                {/* Protected User Routes - Available to all authenticated users */}
                 <Route 
                   path="/profile" 
                   element={
@@ -140,7 +120,7 @@ function App() {
                   } 
                 />
                 
-                {/* Organization Routes */}
+                {/* Organization Routes - Only for users who have created an organization */}
                 <Route 
                   path="/create-organization" 
                   element={
@@ -152,7 +132,7 @@ function App() {
                 <Route 
                   path="/org-dashboard" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireOrganization>
                       <OrgDashboard />
                     </ProtectedRoute>
                   } 
@@ -160,7 +140,7 @@ function App() {
                 <Route 
                   path="/org/edit" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireOrganization>
                       <EditOrganization />
                     </ProtectedRoute>
                   } 
@@ -168,7 +148,7 @@ function App() {
                 <Route 
                   path="/add-job" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute requireOrganization>
                       <AddJob />
                     </ProtectedRoute>
                   } 
