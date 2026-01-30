@@ -16,7 +16,9 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    // 🔥 CRITICAL FIX: Use sessionStorage instead of localStorage
+    // This ensures each browser tab has its own isolated authentication
+    const token = sessionStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -40,7 +42,8 @@ api.interceptors.response.use(
     const message = error.response?.data?.message || error.message || 'An error occurred'
     
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
+      // 🔥 Clear sessionStorage instead of localStorage
+      sessionStorage.removeItem('token')
       window.location.href = '/login'
       toast.error('Session expired. Please login again.')
     } else if (error.response?.status === 404) {
