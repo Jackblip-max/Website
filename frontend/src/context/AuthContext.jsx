@@ -22,7 +22,8 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token')
+      // 🔥 CRITICAL FIX: Use sessionStorage instead of localStorage
+      const token = sessionStorage.getItem('token')
       if (token) {
         const userData = await authService.getProfile()
         setUser(userData)
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Auth check failed:', error)
-      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
     } finally {
       setLoading(false)
     }
@@ -47,7 +48,8 @@ export const AuthProvider = ({ children }) => {
       console.log('🔑 AuthContext: Token:', response.token ? 'exists' : 'missing')
       console.log('🔑 AuthContext: User:', response.user)
       
-      localStorage.setItem('token', response.token)
+      // 🔥 CRITICAL FIX: Store token in sessionStorage for tab isolation
+      sessionStorage.setItem('token', response.token)
       setUser(response.user)
       setIsAuthenticated(true)
       
@@ -64,7 +66,8 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await authService.register(userData)
-      localStorage.setItem('token', response.token)
+      // 🔥 CRITICAL FIX: Store token in sessionStorage for tab isolation
+      sessionStorage.setItem('token', response.token)
       setUser(response.user)
       setIsAuthenticated(true)
       return response
@@ -74,7 +77,8 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
+    // 🔥 CRITICAL FIX: Clear sessionStorage instead of localStorage
+    sessionStorage.removeItem('token')
     setUser(null)
     setIsAuthenticated(false)
   }
