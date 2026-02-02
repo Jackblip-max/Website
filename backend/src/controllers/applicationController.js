@@ -1,374 +1,424 @@
-import { Application, Volunteer, Opportunity, Organization, User } from '../models/index.js'
+import Application from '../models/Application.js';
+import Volunteer from '../models/Volunteer.js';
+import Opportunity from '../models/Opportunity.js';
+import Organization from '../models/Organization.js';
+import User from '../models/User.js';
 
+// POST /api/applications - Create a new application
 export const createApplication = async (req, res) => {
   try {
-    const { opportunityId } = req.body
+    const { opportunityId, coverLetter } = req.body;
+    console.log('📝 ========== CREATE APPLICATION ==========');
+    console.log('📝 User ID:', req.user.id);
+    console.log('📝 Opportunity ID:', opportunityId);
 
-    console.log('📝 Create application request')
-    console.log('   User ID:', req.user.id)
-    console.log('   Opportunity ID:', opportunityId)
+    // Validation
+    if (!opportunityId) {
+      return res.status(400).json({ message: 'Opportunity ID is required' });
+    }
 
-    // User MUST have volunteer profile from registration
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
-    
+    // Find volunteer profile
+    const volunteer = await Volunteer.findOne({
+      where: { userId: req.user.id }
+    });
+
     if (!volunteer) {
-      console.log('❌ No volunteer profile found for user:', req.user.id)
-      return res.status(400).json({ 
-        success: false,
-        message: 'Volunteer profile not found. Please complete your registration.' 
-      })
-    }
-
-    console.log('✅ Volunteer profile found:', volunteer.id)
-
-    // Check if opportunity exists and is active - INCLUDE ORGANIZATION
-    const opportunity = await Opportunity.findByPk(opportunityId, {
-      include: [{
-        model: Organization,
-        as: 'organization',
-        attributes: ['id', 'userId', 'name']
-      }]
-    })
-    
-    if (!opportunity) {
-      console.log('❌ Opportunity not found:', opportunityId)
       return res.status(404).json({ 
-        success: false,
-        message: 'Opportunity not found' 
-      })
+        message: 'Volunteer profile not found. Please complete your profile first.' 
+      });
     }
 
-    console.log('✅ Opportunity found:', opportunity.title)
-    console.log('📋 Opportunity Organization:', {
-      id: opportunity.organization?.id,
-      userId: opportunity.organization?.userId,
-      name: opportunity.organization?.name
-    })
-    
-    // ⭐ CRITICAL FIX: Check if user owns the organization that posted this opportunity
+    // Check if opportunity exists
+    const opportunity = await Opportunity.findByPk(opportunityId, {
+      include: [
+        {
+          model: Organization,
+          as: 'organization'
+        }
+      ]
+    });
+
+    if (!opportunity) {
+      return res.status(404).json({ message: 'Opportunity not found' });
+    }
+
+    // Check if opportunity is active
+    if (opportunity.status !== 'active') {
+      return res.status(400).json({ 
+        message: 'This opportunity is no longer accepting applications' 
+      });
+    }
+
+    // 🔥 CRITICAL CHECK: Users cannot apply to their own organization's opportunities
     const userOrganization = await Organization.findOne({
       where: { userId: req.user.id }
-    })
+    });
 
-    if (userOrganization) {
-      console.log('🏢 User has organization:', userOrganization.name, '(id:', userOrganization.id, ')')
-      
-      // Check if this opportunity belongs to the user's organization
-      if (opportunity.organizationId === userOrganization.id) {
-        console.log('❌ BLOCKED: User trying to apply to their own organization\'s opportunity')
-        return res.status(403).json({ 
-          success: false,
-          message: 'You cannot apply to opportunities from your own organization' 
-        })
-      }
-    }
-
-    console.log('✅ Ownership check passed - user can apply to this opportunity')
-    
-    if (opportunity.status !== 'active') {
-      console.log('❌ Opportunity is not active. Status:', opportunity.status)
-      return res.status(400).json({ 
-        success: false,
-        message: 'This opportunity is no longer active' 
-      })
+    if (userOrganization && opportunity.organizationId === userOrganization.id) {
+      console.log('❌ User trying to apply to their own organization opportunity');
+      return res.status(403).json({ 
+        message: 'You cannot apply to opportunities from your own organization' 
+      });
     }
 
     // Check if already applied
     const existingApplication = await Application.findOne({
-      where: { 
-        opportunityId, 
-        volunteerId: volunteer.id 
+      where: {
+        volunteerId: volunteer.id,
+        opportunityId: opportunityId
       }
-    })
-    
+    });
+
     if (existingApplication) {
-      console.log('⚠️ Already applied. Application ID:', existingApplication.id)
       return res.status(400).json({ 
-        success: false,
-        message: 'Already applied to this opportunity' 
-      })
+        message: 'You have already applied to this opportunity' 
+      });
     }
 
     // Create application
     const application = await Application.create({
-      opportunityId,
       volunteerId: volunteer.id,
+      opportunityId: opportunityId,
+      coverLetter: coverLetter || '',
       status: 'pending'
-    })
+    });
 
-    console.log('✅ Application created successfully')
-    console.log('   Application ID:', application.id)
-    console.log('   Status:', application.status)
-    console.log('   Applied at:', application.appliedAt || application.createdAt)
+    console.log('✅ Application created successfully');
+
+    // Fetch complete application with includes
+    const completeApplication = await Application.findByPk(application.id, {
+      include: [
+        {
+          model: Volunteer,
+          as: 'volunteer',
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'email', 'phone']
+            }
+          ]
+        },
+        {
+          model: Opportunity,
+          as: 'opportunity',
+          include: [
+            {
+              model: Organization,
+              as: 'organization'
+            }
+          ]
+        }
+      ]
+    });
 
     res.status(201).json({
       success: true,
       message: 'Application submitted successfully',
-      data: application
-    })
-  } catch (error) {
-    console.error('❌ Create application error:', error)
-    console.error('Error stack:', error.stack)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to submit application', 
-      error: error.message 
-    })
-  }
-}
+      data: completeApplication
+    });
 
+  } catch (error) {
+    console.error('❌ Create application error:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Failed to submit application',
+      error: error.message 
+    });
+  }
+};
+
+// GET /api/applications - Get all applications for the current user
 export const getMyApplications = async (req, res) => {
   try {
-    console.log('📋 Fetching applications for user:', req.user.id)
+    console.log('📋 ========== GET USER APPLICATIONS ==========');
+    console.log('📋 User ID:', req.user.id);
 
-    // User MUST have volunteer profile from registration
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
-    
-    if (!volunteer) {
-      // Return empty array instead of error (better UX)
-      console.log('⚠️ No volunteer profile found for user:', req.user.id)
-      return res.json({
-        success: true,
-        data: [],
-        count: 0,
-        message: 'No volunteer profile found. Please complete your registration.'
-      })
-    }
+    // Check if user is requesting as volunteer or organization
+    const volunteer = await Volunteer.findOne({
+      where: { userId: req.user.id }
+    });
 
-    console.log('✅ Volunteer profile found:', volunteer.id)
+    const organization = await Organization.findOne({
+      where: { userId: req.user.id }
+    });
 
-    // Fetch applications with full details
-    const applications = await Application.findAll({
-      where: { volunteerId: volunteer.id },
-      include: [{
-        model: Opportunity,
-        as: 'opportunity',
-        include: [{
-          model: Organization,
-          as: 'organization',
-          attributes: ['id', 'name', 'logo', 'description', 'contactDetails']
-        }],
-        attributes: ['id', 'title', 'description', 'category', 'location', 'mode', 'timeCommitment', 'requirements', 'benefits', 'deadline', 'status']
-      }],
-      order: [['createdAt', 'DESC']]
-    })
+    let applications = [];
 
-    console.log('✅ Found', applications.length, 'applications')
-    
-    if (applications.length > 0) {
-      console.log('📋 Applications summary:')
-      applications.forEach((app, index) => {
-        console.log(`   ${index + 1}. ${app.opportunity?.title || 'Unknown'} - Status: ${app.status}`)
-      })
+    if (volunteer) {
+      // Get applications submitted BY this volunteer
+      applications = await Application.findAll({
+        where: { volunteerId: volunteer.id },
+        include: [
+          {
+            model: Opportunity,
+            as: 'opportunity',
+            include: [
+              {
+                model: Organization,
+                as: 'organization'
+              }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+      console.log('✅ Found', applications.length, 'applications as volunteer');
+    } else if (organization) {
+      // Get applications TO this organization's opportunities
+      const opportunities = await Opportunity.findAll({
+        where: { organizationId: organization.id },
+        attributes: ['id']
+      });
+
+      const opportunityIds = opportunities.map(opp => opp.id);
+
+      applications = await Application.findAll({
+        where: { opportunityId: opportunityIds },
+        include: [
+          {
+            model: Volunteer,
+            as: 'volunteer',
+            include: [
+              {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'name', 'email', 'phone']
+              }
+            ]
+          },
+          {
+            model: Opportunity,
+            as: 'opportunity',
+            include: [
+              {
+                model: Organization,
+                as: 'organization'
+              }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+      console.log('✅ Found', applications.length, 'applications for organization');
     }
 
     res.json({
       success: true,
-      data: applications,
-      count: applications.length
-    })
-  } catch (error) {
-    console.error('❌ Get applications error:', error)
-    console.error('Error stack:', error.stack)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get applications', 
-      error: error.message 
-    })
-  }
-}
+      data: applications
+    });
 
+  } catch (error) {
+    console.error('❌ Get applications error:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to fetch applications',
+      error: error.message 
+    });
+  }
+};
+
+// PUT /api/applications/:id/accept - Accept an application (Organization only)
 export const acceptApplication = async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
+    console.log('✅ ========== ACCEPT APPLICATION ==========');
+    console.log('✅ User ID:', req.user.id);
+    console.log('✅ Application ID:', id);
 
-    console.log('✅ Accept application request')
-    console.log('   Application ID:', id)
-    console.log('   User ID:', req.user.id)
+    // Find organization
+    const organization = await Organization.findOne({
+      where: { userId: req.user.id }
+    });
 
+    if (!organization) {
+      return res.status(403).json({ 
+        message: 'Only organizations can accept applications' 
+      });
+    }
+
+    // Find application
     const application = await Application.findByPk(id, {
-      include: [{
-        model: Opportunity,
-        as: 'opportunity',
-        include: [{
-          model: Organization,
-          as: 'organization'
-        }]
-      }]
-    })
+      include: [
+        {
+          model: Opportunity,
+          as: 'opportunity'
+        },
+        {
+          model: Volunteer,
+          as: 'volunteer',
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'email', 'phone']
+            }
+          ]
+        }
+      ]
+    });
 
     if (!application) {
-      console.log('❌ Application not found')
-      return res.status(404).json({ 
-        success: false,
-        message: 'Application not found' 
-      })
+      return res.status(404).json({ message: 'Application not found' });
     }
 
-    console.log('✅ Application found')
-    console.log('   Opportunity:', application.opportunity?.title)
-    console.log('   Organization:', application.opportunity?.organization?.name)
-    console.log('   Organization owner:', application.opportunity?.organization?.userId)
-
-    // Check if user owns the organization
-    if (application.opportunity.organization.userId !== req.user.id) {
-      console.log('❌ Not authorized - User does not own this organization')
+    // Verify the application is for this organization's opportunity
+    if (application.opportunity.organizationId !== organization.id) {
       return res.status(403).json({ 
-        success: false,
-        message: 'Not authorized' 
-      })
+        message: 'You can only accept applications for your own opportunities' 
+      });
     }
-
-    console.log('✅ Authorization check passed')
 
     // Update application status
-    await application.update({ status: 'accepted' })
+    application.status = 'accepted';
+    await application.save();
 
-    console.log('✅ Application accepted successfully')
+    console.log('✅ Application accepted successfully');
 
     res.json({
       success: true,
       message: 'Application accepted successfully',
       data: application
-    })
-  } catch (error) {
-    console.error('❌ Accept application error:', error)
-    console.error('Error stack:', error.stack)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to accept application', 
-      error: error.message 
-    })
-  }
-}
+    });
 
+  } catch (error) {
+    console.error('❌ Accept application error:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to accept application',
+      error: error.message 
+    });
+  }
+};
+
+// PUT /api/applications/:id/decline - Decline an application (Organization only)
 export const declineApplication = async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
+    const { reason } = req.body;
+    console.log('❌ ========== DECLINE APPLICATION ==========');
+    console.log('❌ User ID:', req.user.id);
+    console.log('❌ Application ID:', id);
 
-    console.log('❌ Decline application request')
-    console.log('   Application ID:', id)
-    console.log('   User ID:', req.user.id)
+    // Find organization
+    const organization = await Organization.findOne({
+      where: { userId: req.user.id }
+    });
 
+    if (!organization) {
+      return res.status(403).json({ 
+        message: 'Only organizations can decline applications' 
+      });
+    }
+
+    // Find application
     const application = await Application.findByPk(id, {
-      include: [{
-        model: Opportunity,
-        as: 'opportunity',
-        include: [{
-          model: Organization,
-          as: 'organization'
-        }]
-      }]
-    })
+      include: [
+        {
+          model: Opportunity,
+          as: 'opportunity'
+        },
+        {
+          model: Volunteer,
+          as: 'volunteer',
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'email', 'phone']
+            }
+          ]
+        }
+      ]
+    });
 
     if (!application) {
-      console.log('❌ Application not found')
-      return res.status(404).json({ 
-        success: false,
-        message: 'Application not found' 
-      })
+      return res.status(404).json({ message: 'Application not found' });
     }
 
-    console.log('✅ Application found')
-    console.log('   Opportunity:', application.opportunity?.title)
-    console.log('   Organization:', application.opportunity?.organization?.name)
-
-    // Check if user owns the organization
-    if (application.opportunity.organization.userId !== req.user.id) {
-      console.log('❌ Not authorized - User does not own this organization')
+    // Verify the application is for this organization's opportunity
+    if (application.opportunity.organizationId !== organization.id) {
       return res.status(403).json({ 
-        success: false,
-        message: 'Not authorized' 
-      })
+        message: 'You can only decline applications for your own opportunities' 
+      });
     }
-
-    console.log('✅ Authorization check passed')
 
     // Update application status
-    await application.update({ status: 'rejected' })
+    application.status = 'rejected';
+    if (reason) {
+      application.rejectionReason = reason;
+    }
+    await application.save();
 
-    console.log('✅ Application declined successfully')
+    console.log('✅ Application declined successfully');
 
     res.json({
       success: true,
       message: 'Application declined successfully',
       data: application
-    })
-  } catch (error) {
-    console.error('❌ Decline application error:', error)
-    console.error('Error stack:', error.stack)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to decline application', 
-      error: error.message 
-    })
-  }
-}
+    });
 
+  } catch (error) {
+    console.error('❌ Decline application error:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to decline application',
+      error: error.message 
+    });
+  }
+};
+
+// DELETE /api/applications/:id - Delete/withdraw an application
 export const deleteApplication = async (req, res) => {
   try {
-    const { id } = req.params
-
-    console.log('🗑️ Withdraw application request')
-    console.log('   Application ID:', id)
-    console.log('   User ID:', req.user.id)
+    const { id } = req.params;
+    console.log('🗑️ ========== DELETE APPLICATION ==========');
+    console.log('🗑️ User ID:', req.user.id);
+    console.log('🗑️ Application ID:', id);
 
     // Find volunteer profile
-    const volunteer = await Volunteer.findOne({ where: { userId: req.user.id } })
-    
-    if (!volunteer) {
-      console.log('❌ Volunteer profile not found')
-      return res.status(400).json({ 
-        success: false,
-        message: 'Volunteer profile not found' 
-      })
-    }
+    const volunteer = await Volunteer.findOne({
+      where: { userId: req.user.id }
+    });
 
-    console.log('✅ Volunteer profile found:', volunteer.id)
+    if (!volunteer) {
+      return res.status(403).json({ 
+        message: 'Only volunteers can delete their applications' 
+      });
+    }
 
     // Find application
     const application = await Application.findOne({
-      where: { 
-        id, 
-        volunteerId: volunteer.id 
+      where: {
+        id: id,
+        volunteerId: volunteer.id
       }
-    })
+    });
 
     if (!application) {
-      console.log('❌ Application not found or does not belong to user')
       return res.status(404).json({ 
-        success: false,
         message: 'Application not found' 
-      })
+      });
     }
-
-    console.log('✅ Application found - Status:', application.status)
 
     // Only allow deletion of pending applications
     if (application.status !== 'pending') {
-      console.log('❌ Cannot withdraw - Application status is:', application.status)
-      return res.status(400).json({
-        success: false,
-        message: 'Can only withdraw pending applications'
-      })
+      return res.status(400).json({ 
+        message: `Cannot withdraw application with status: ${application.status}` 
+      });
     }
 
-    // Delete application
-    await application.destroy()
+    await application.destroy();
 
-    console.log('✅ Application withdrawn successfully')
+    console.log('✅ Application deleted successfully');
 
     res.json({
       success: true,
       message: 'Application withdrawn successfully'
-    })
+    });
+
   } catch (error) {
-    console.error('❌ Delete application error:', error)
-    console.error('Error stack:', error.stack)
+    console.error('❌ Delete application error:', error.message);
     res.status(500).json({ 
-      success: false,
-      message: 'Failed to withdraw application', 
+      message: 'Failed to delete application',
       error: error.message 
-    })
+    });
   }
-}
+};
