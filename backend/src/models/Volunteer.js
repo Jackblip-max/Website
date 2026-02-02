@@ -1,5 +1,5 @@
-import { DataTypes } from 'sequelize'
-import sequelize from '../config/database.js'
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 const Volunteer = sequelize.define('Volunteer', {
   id: {
@@ -10,44 +10,35 @@ const Volunteer = sequelize.define('Volunteer', {
   userId: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    unique: true,
     references: {
       model: 'users',
       key: 'id'
     }
   },
   education: {
-    type: DataTypes.ENUM('highSchool', 'undergraduate', 'graduate'),
-    allowNull: false
-  },
-  skills: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
     allowNull: true
   },
-  // NEW: User preferences for ML recommendations
+  skills: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   preferredCategories: {
     type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: [],
-    comment: 'Array of preferred categories: ["environment", "education", etc.]'
+    defaultValue: []
   },
   preferredModes: {
     type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: [],
-    comment: 'Array of preferred work modes: ["onsite", "remote", "hybrid"]'
+    defaultValue: []
   },
-  // Track user interactions for ML
   viewedOpportunities: {
     type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: [],
-    comment: 'Array of opportunity IDs user has viewed'
+    defaultValue: []
   },
   clickedOpportunities: {
     type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: [],
-    comment: 'Array of opportunity IDs user has clicked'
+    defaultValue: []
   },
   notificationsEnabled: {
     type: DataTypes.BOOLEAN,
@@ -56,7 +47,27 @@ const Volunteer = sequelize.define('Volunteer', {
 }, {
   tableName: 'volunteers',
   timestamps: true
-})
+});
 
-export { Volunteer }
-export default Volunteer
+// Define associations
+Volunteer.associate = (models) => {
+  // Volunteer belongs to User
+  Volunteer.belongsTo(models.User, {
+    foreignKey: 'userId',
+    as: 'user'
+  });
+  
+  // Volunteer has many Applications
+  Volunteer.hasMany(models.Application, {
+    foreignKey: 'volunteerId',
+    as: 'applications'
+  });
+  
+  // Volunteer has many SavedOpportunities
+  Volunteer.hasMany(models.SavedOpportunity, {
+    foreignKey: 'volunteerId',
+    as: 'savedOpportunities'
+  });
+};
+
+export default Volunteer;
