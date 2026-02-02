@@ -51,7 +51,7 @@ router.get('/', authenticate, async (req, res) => {
           ]
         }
       ],
-      order: [['savedAt', 'DESC']]
+      order: [['createdAt', 'DESC']]  // 🔥 FIXED: Use createdAt instead of savedAt
     });
 
     console.log('✅ Found', savedOpportunities.length, 'saved opportunities');
