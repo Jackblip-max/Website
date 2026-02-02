@@ -1,11 +1,19 @@
-import { DataTypes } from 'sequelize'
-import sequelize from '../config/database.js'
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 const SavedOpportunity = sequelize.define('SavedOpportunity', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
+  },
+  volunteerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'volunteers',
+      key: 'id'
+    }
   },
   opportunityId: {
     type: DataTypes.INTEGER,
@@ -15,24 +23,28 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
       key: 'id'
     }
   },
-  volunteerId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'volunteers',
-      key: 'id'
-    }
+  savedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
   }
 }, {
   tableName: 'saved_opportunities',
-  timestamps: true,
-  indexes: [
-    {
-      unique: true,
-      fields: ['opportunityId', 'volunteerId']
-    }
-  ]
-})
+  timestamps: true
+});
 
-export { SavedOpportunity }
-export default SavedOpportunity
+// Define associations
+SavedOpportunity.associate = (models) => {
+  // SavedOpportunity belongs to Volunteer
+  SavedOpportunity.belongsTo(models.Volunteer, {
+    foreignKey: 'volunteerId',
+    as: 'volunteer'
+  });
+  
+  // SavedOpportunity belongs to Opportunity
+  SavedOpportunity.belongsTo(models.Opportunity, {
+    foreignKey: 'opportunityId',
+    as: 'opportunity'
+  });
+};
+
+export default SavedOpportunity;
