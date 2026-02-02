@@ -22,17 +22,15 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
       model: 'opportunities',
       key: 'id'
     }
-  },
-  savedAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
   }
+  // 🔥 REMOVED: savedAt field (doesn't exist in your database)
+  // Sequelize automatically adds createdAt and updatedAt
 }, {
   tableName: 'saved_opportunities',
-  timestamps: true
+  timestamps: true  // This adds createdAt and updatedAt automatically
 });
 
-// Define associations
+// This function will be called by models/index.js
 SavedOpportunity.associate = (models) => {
   // SavedOpportunity belongs to Volunteer
   SavedOpportunity.belongsTo(models.Volunteer, {
