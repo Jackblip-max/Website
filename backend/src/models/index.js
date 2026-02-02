@@ -28,9 +28,13 @@ Application.belongsTo(Volunteer, { foreignKey: 'volunteerId', as: 'volunteer' })
 Opportunity.hasMany(Application, { foreignKey: 'opportunityId', as: 'applications' })
 Application.belongsTo(Opportunity, { foreignKey: 'opportunityId', as: 'opportunity' })
 
-// Volunteer - SavedOpportunities (Many-to-Many)
-Volunteer.belongsToMany(Opportunity, { through: SavedOpportunity, foreignKey: 'volunteerId', as: 'savedOpportunities' })
-Opportunity.belongsToMany(Volunteer, { through: SavedOpportunity, foreignKey: 'opportunityId', as: 'savedByVolunteers' })
+// 🔥 FIXED: SavedOpportunity Associations
+// Changed from belongsToMany to proper hasMany/belongsTo relationships
+Volunteer.hasMany(SavedOpportunity, { foreignKey: 'volunteerId', as: 'savedOpportunities' })
+SavedOpportunity.belongsTo(Volunteer, { foreignKey: 'volunteerId', as: 'volunteer' })
+
+Opportunity.hasMany(SavedOpportunity, { foreignKey: 'opportunityId', as: 'savedBy' })
+SavedOpportunity.belongsTo(Opportunity, { foreignKey: 'opportunityId', as: 'opportunity' })
 
 // User - Notifications (One-to-Many)
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' })
@@ -40,7 +44,7 @@ Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' })
 User.hasMany(AdminLog, { foreignKey: 'adminId', as: 'adminLogs' })
 AdminLog.belongsTo(User, { foreignKey: 'adminId', as: 'admin' })
 
-// ⭐ NEW: Certificate Relationships
+// ⭐ Certificate Relationships
 Certificate.belongsTo(Application, { foreignKey: 'applicationId', as: 'application' })
 Application.hasOne(Certificate, { foreignKey: 'applicationId', as: 'certificate' })
 
