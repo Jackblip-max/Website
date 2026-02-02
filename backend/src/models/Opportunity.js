@@ -1,5 +1,5 @@
-import { DataTypes } from 'sequelize'
-import sequelize from '../config/database.js'
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 const Opportunity = sequelize.define('Opportunity', {
   id: {
@@ -24,41 +24,69 @@ const Opportunity = sequelize.define('Opportunity', {
     allowNull: false
   },
   category: {
-    type: DataTypes.ENUM('environment', 'education', 'healthcare', 'community', 'animals', 'arts'),
-    allowNull: false
-  },
-  location: {
     type: DataTypes.STRING,
     allowNull: false
   },
   mode: {
-    type: DataTypes.ENUM('onsite', 'remote', 'hybrid'),
+    type: DataTypes.ENUM('onsite', 'online', 'hybrid'),
     allowNull: false
   },
-  timeCommitment: {
+  location: {
     type: DataTypes.STRING,
-    allowNull: false
-  },
-  requirements: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
-  benefits: {
-    type: DataTypes.TEXT,
     allowNull: true
+  },
+  startDate: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  endDate: {
+    type: DataTypes.DATE,
+    allowNull: false
   },
   deadline: {
     type: DataTypes.DATE,
     allowNull: false
   },
+  requiredSkills: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   status: {
-    type: DataTypes.ENUM('active', 'expired', 'closed'),
+    type: DataTypes.ENUM('draft', 'active', 'closed', 'cancelled'),
     defaultValue: 'active'
+  },
+  maxVolunteers: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  image: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 }, {
   tableName: 'opportunities',
   timestamps: true
-})
+});
 
-export { Opportunity }
-export default Opportunity
+// Define associations
+Opportunity.associate = (models) => {
+  // Opportunity belongs to Organization
+  Opportunity.belongsTo(models.Organization, {
+    foreignKey: 'organizationId',
+    as: 'organization'
+  });
+  
+  // Opportunity has many Applications
+  Opportunity.hasMany(models.Application, {
+    foreignKey: 'opportunityId',
+    as: 'applications'
+  });
+  
+  // Opportunity has many SavedOpportunities
+  Opportunity.hasMany(models.SavedOpportunity, {
+    foreignKey: 'opportunityId',
+    as: 'savedBy'
+  });
+};
+
+export default Opportunity;
