@@ -30,7 +30,6 @@ const SavedOpportunities = () => {
     mutationFn: (opportunityId) => {
       console.log('🗑️ UNSAVE MUTATION - Opportunity ID:', opportunityId)
       console.log('🗑️ User ID:', user?.id)
-      console.log('🗑️ Volunteer ID:', user?.volunteer?.id)
       return volunteerService.unsaveOpportunity(opportunityId)
     },
     onSuccess: () => {
@@ -58,16 +57,21 @@ const SavedOpportunities = () => {
     }
   })
 
-  const handleUnsave = (opportunity, e) => {
+  const handleUnsave = (savedItem, e) => {
     e.stopPropagation()
     
     console.log('🗑️ HANDLE UNSAVE CALLED')
-    console.log('🗑️ Full opportunity object:', opportunity)
-    console.log('🗑️ Opportunity ID:', opportunity.id)
-    console.log('🗑️ Opportunity Title:', opportunity.title)
+    console.log('🗑️ Full saved item:', savedItem)
     
-    if (window.confirm(`Remove "${opportunity.title}" from saved items?`)) {
-      unsaveMutation.mutate(opportunity.id)
+    // 🔥 FIX 1: Use opportunityId instead of id
+    const opportunityId = savedItem.opportunityId
+    const opportunityTitle = savedItem.opportunity?.title || 'this opportunity'
+    
+    console.log('🗑️ Opportunity ID to delete:', opportunityId)
+    console.log('🗑️ Opportunity Title:', opportunityTitle)
+    
+    if (window.confirm(`Remove "${opportunityTitle}" from saved items?`)) {
+      unsaveMutation.mutate(opportunityId)
     }
   }
 
@@ -167,7 +171,7 @@ const SavedOpportunities = () => {
   console.log('📊 Count:', savedOpportunities.length)
   if (savedOpportunities.length > 0) {
     console.log('📊 First item structure:', savedOpportunities[0])
-    console.log('📊 All IDs:', savedOpportunities.map(o => ({ id: o.id, title: o.title })))
+    console.log('📊 Opportunity nested data:', savedOpportunities[0]?.opportunity)
   }
 
   return (
@@ -187,19 +191,27 @@ const SavedOpportunities = () => {
         {/* Opportunities Grid */}
         {savedOpportunities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {savedOpportunities.map((opportunity) => {
+            {savedOpportunities.map((savedItem) => {
+              // 🔥 FIX 2: Access opportunity data from nested object
+              const opportunity = savedItem.opportunity
+              
+              if (!opportunity) {
+                console.error('❌ No opportunity data for saved item:', savedItem)
+                return null
+              }
+              
               console.log('🔍 Rendering card for opportunity:', {
-                id: opportunity.id,
-                title: opportunity.title,
-                isSaved: opportunity.isSaved
+                savedId: savedItem.id,
+                opportunityId: opportunity.id,
+                title: opportunity.title
               })
               
               return (
                 <div
-                  key={opportunity.id}
+                  key={savedItem.id}
                   className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden group"
                 >
-                  <div className="p-6">           
+                  <div className="p-6">            
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
@@ -207,7 +219,7 @@ const SavedOpportunities = () => {
                           {opportunity.title}
                         </h3>
                         <p className="text-emerald-600 font-medium mb-1">
-                          {opportunity.organizationName || opportunity.organization?.name}
+                          {opportunity.organization?.name}
                         </p>
                         <div className="flex items-center text-gray-600 text-sm">
                           <MapPin className="w-4 h-4 mr-1" />
@@ -246,7 +258,7 @@ const SavedOpportunities = () => {
                         {applyMutation.isPending ? 'Applying...' : t('apply')}
                       </button>
                       <button
-                        onClick={(e) => handleUnsave(opportunity, e)}
+                        onClick={(e) => handleUnsave(savedItem, e)}
                         disabled={unsaveMutation.isPending}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Remove from saved"
