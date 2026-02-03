@@ -1,6 +1,6 @@
 import { Certificate, Application, Opportunity, Volunteer, Organization, User } from '../models/index.js'
 import CertificateService from '../services/certificateService.js'
-import emailService from '../services/emailService.js'
+import { sendCertificateEmail } from '../services/emailService.js'
 import { Op } from 'sequelize'
 
 // @desc    Generate certificate for accepted volunteer
@@ -10,10 +10,31 @@ export const generateCertificate = async (req, res) => {
   try {
     const { applicationId } = req.params
     const { hoursContributed, completionDate, customMessage } = req.body
-    const organizationId = req.user.organizationId
+    
+    // Get organization ID from the authenticated user
+    // First, check if user has organizationId directly
+    let organizationId = req.user.organizationId
+    
+    // If not, try to get it from the Organization model
+    if (!organizationId) {
+      const org = await Organization.findOne({ 
+        where: { userId: req.user.id } 
+      })
+      
+      if (!org) {
+        return res.status(403).json({
+          success: false,
+          message: 'No organization found for this user'
+        })
+      }
+      
+      organizationId = org.id
+    }
 
     console.log('📋 Generating certificate request:')
     console.log('Application ID:', applicationId)
+    console.log('User ID:', req.user.id)
+    console.log('User Role:', req.user.role)
     console.log('Organization ID:', organizationId)
     console.log('Hours:', hoursContributed)
     console.log('Date:', completionDate)
@@ -58,6 +79,7 @@ export const generateCertificate = async (req, res) => {
     console.log('✅ Application found:', {
       id: application.id,
       status: application.status,
+      opportunityId: application.opportunityId,
       opportunityOrgId: application.opportunity?.organization?.id,
       requestingOrgId: organizationId
     })
@@ -65,6 +87,8 @@ export const generateCertificate = async (req, res) => {
     // CRITICAL: Check if the organization owns this opportunity/application
     if (application.opportunity.organization.id !== organizationId) {
       console.log('❌ Authorization failed: Organization does not own this application')
+      console.log('Expected org ID:', organizationId)
+      console.log('Actual org ID:', application.opportunity.organization.id)
       return res.status(403).json({
         success: false,
         message: 'Not authorized to issue certificate for this application'
@@ -94,6 +118,12 @@ export const generateCertificate = async (req, res) => {
 
     // Get organization details for certificate
     const organization = application.opportunity.organization
+    
+    // Generate unique certificate number FIRST
+    const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    
+    // Generate verification code (shorter code for easy verification)
+    const verificationCode = `${Math.random().toString(36).substr(2, 8).toUpperCase()}`
 
     // Generate certificate using service
     const certificateData = {
@@ -103,25 +133,54 @@ export const generateCertificate = async (req, res) => {
       opportunityTitle: application.opportunity.title,
       hoursContributed,
       completionDate,
+      location: application.opportunity.location || 'Remote', // ✅ ADD THIS
       customMessage,
-      signatoryName: organization.signatoryName,
-      signatoryTitle: organization.signatoryTitle,
-      signatureUrl: organization.signatureUrl
+      certificateNumber,
+      verificationCode
     }
 
     console.log('🎨 Generating certificate with data:', certificateData)
 
-    const certificateBuffer = await CertificateService.generateCertificate(certificateData)
+    const certificateResult = await CertificateService.generateCertificate(certificateData)
     
-    // Generate unique certificate number
-    const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    // Handle different return types from CertificateService
+    let certificateBuffer
+    let certificateFilename
+    
+    if (Buffer.isBuffer(certificateResult)) {
+      // Service returned a buffer directly
+      certificateBuffer = certificateResult
+      certificateFilename = `${certificateNumber}.jpg`
+    } else if (certificateResult && certificateResult.buffer) {
+      // Service returned an object with buffer property
+      certificateBuffer = certificateResult.buffer
+      certificateFilename = certificateResult.filename || `${certificateNumber}.jpg`
+    } else if (certificateResult && certificateResult.filename) {
+      // Service saved the file and returned filename
+      certificateFilename = certificateResult.filename
+      console.log('✅ Certificate already saved by service:', certificateFilename)
+    } else {
+      throw new Error('Invalid certificate generation result')
+    }
+    
+    console.log('✅ Certificate generated:', certificateFilename)
     
     // Generate QR code data
-    const qrCode = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-certificate/${certificateNumber}`
+    const qrCode = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-certificate/${verificationCode}`
+
+    // Get the user who issued the certificate (organization user)
+    const issuedBy = req.user.id
+
+    console.log('🔐 Certificate codes generated:')
+    console.log('Certificate Number:', certificateNumber)
+    console.log('Verification Code:', verificationCode)
+    console.log('Issued By:', issuedBy)
 
     // Save certificate to database
     const certificate = await Certificate.create({
       certificateNumber,
+      verificationCode,
+      issuedBy,
       applicationId,
       volunteerId: application.volunteerId,
       opportunityId: application.opportunityId,
@@ -136,30 +195,41 @@ export const generateCertificate = async (req, res) => {
 
     console.log('✅ Certificate saved to database:', certificate.id)
 
-    // Save certificate file
-    const fs = await import('fs')
-    const path = await import('path')
-    
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'certificates')
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true })
+    // Save certificate file (if not already saved by service)
+    let filePath
+    if (certificateBuffer) {
+      const fs = await import('fs')
+      const path = await import('path')
+      
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'certificates')
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true })
+      }
+      
+      filePath = path.join(uploadsDir, certificateFilename)
+      fs.writeFileSync(filePath, certificateBuffer)
+      console.log('✅ Certificate file saved:', filePath)
+    } else {
+      // File already saved by service, just get the path
+      const path = await import('path')
+      filePath = path.join(process.cwd(), 'uploads', 'certificates', certificateFilename)
+      console.log('✅ Certificate file already saved at:', filePath)
     }
-    
-    const filePath = path.join(uploadsDir, `${certificateNumber}.pdf`)
-    fs.writeFileSync(filePath, certificateBuffer)
-
-    console.log('✅ Certificate file saved:', filePath)
 
     // Send certificate via email
     try {
-      await emailService.sendCertificateEmail({
-        to: application.volunteer.user.email,
-        volunteerName: application.volunteer.user.name,
-        certificateNumber,
-        organizationName: organization.name,
-        opportunityTitle: application.opportunity.title,
-        certificateBuffer
-      })
+      await sendCertificateEmail(
+        application.volunteer.user.email,
+        application.volunteer.user.name,
+        {
+          opportunityTitle: application.opportunity.title,
+          organizationName: organization.name,
+          certificateNumber,
+          verificationCode,
+          certificateUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/certificates/${certificateNumber}.pdf`,
+          certificateFilePath: filePath
+        }
+      )
       console.log('✅ Certificate email sent')
     } catch (emailError) {
       console.error('❌ Error sending certificate email:', emailError)
@@ -172,6 +242,7 @@ export const generateCertificate = async (req, res) => {
       certificate: {
         id: certificate.id,
         certificateNumber: certificate.certificateNumber,
+        verificationCode: certificate.verificationCode,
         qrCode: certificate.qrCode,
         certificateUrl: certificate.certificateUrl,
         issuedDate: certificate.issuedDate
