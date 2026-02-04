@@ -10,7 +10,7 @@ import {
   checkEmailAvailability,
   checkNameAvailability,
   checkPhoneAvailability,
-  validateEmailExistence, // Add this import
+  validateEmailExistence, 
   verifyEmail, 
   resendVerification 
 } from '../controllers/authController.js'
@@ -19,7 +19,7 @@ import { upload } from '../middleware/upload.js'
 
 const router = express.Router()
 
-router.post('/validate-email', validateEmailExistence) // Add this route
+router.post('/validate-email', validateEmailExistence) 
 router.post('/check-email', checkEmailAvailability)
 router.post('/check-name', checkNameAvailability)
 router.post('/check-phone', checkPhoneAvailability)
