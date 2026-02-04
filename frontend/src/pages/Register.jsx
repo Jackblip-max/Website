@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Eye, EyeOff, CheckCircle, XCircle, Loader as LoaderIcon, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, XCircle, Loader as LoaderIcon, ArrowLeft, AlertCircle } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import DynamicBackground from '../components/common/DynamicBackground'
+import api from '../services/api'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -13,6 +14,15 @@ const Register = () => {
   const { register: registerUser } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState('')
+  
+  // Field validation states
+  const [fieldValidation, setFieldValidation] = useState({
+    email: { checking: false, valid: null, message: '' },
+    phone: { checking: false, valid: null, message: '' },
+    name: { valid: null, message: '' },
+    password: { valid: null, message: '' }
+  })
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,7 +30,6 @@ const Register = () => {
     password: '',
     education: 'undergraduate',
     skills: '',
-    // NEW: Preferences
     preferredCategories: [],
     preferredModes: []
   })
@@ -40,6 +49,88 @@ const Register = () => {
     { value: 'hybrid', label: 'Hybrid', icon: '🔄' }
   ]
 
+  // Debounce helper
+  const useDebounce = (value, delay) => {
+    const [debouncedValue, setDebouncedValue] = useState(value)
+    useEffect(() => {
+      const handler = setTimeout(() => setDebouncedValue(value), delay)
+      return () => clearTimeout(handler)
+    }, [value, delay])
+    return debouncedValue
+  }
+
+  const debouncedEmail = useDebounce(formData.email, 500)
+  const debouncedPhone = useDebounce(formData.phone, 500)
+  const debouncedName = useDebounce(formData.name, 500)
+
+  // Reusable validation function
+  const checkFieldAvailability = async (fieldName, value, endpoint, minLength = 0) => {
+    if (!value || value.length < minLength) return
+
+    setFieldValidation(prev => ({
+      ...prev,
+      [fieldName]: { checking: true, valid: null, message: 'Checking...' }
+    }))
+
+    try {
+      const response = await api.post(endpoint, { [fieldName]: value })
+      setFieldValidation(prev => ({
+        ...prev,
+        [fieldName]: { 
+          checking: false, 
+          valid: response.available, 
+          message: response.message || (response.available ? `${fieldName} available` : `${fieldName} already registered`)
+        }
+      }))
+    } catch (error) {
+      setFieldValidation(prev => ({
+        ...prev,
+        [fieldName]: { checking: false, valid: null, message: '' }
+      }))
+    }
+  }
+
+  // Validate name availability
+  useEffect(() => {
+    checkFieldAvailability('name', debouncedName, '/auth/check-name', 2)
+  }, [debouncedName])
+
+  // Validate email availability
+  useEffect(() => {
+    if (debouncedEmail && debouncedEmail.includes('@')) {
+      checkFieldAvailability('email', debouncedEmail, '/auth/check-email')
+    }
+  }, [debouncedEmail])
+
+  // Validate phone availability
+  useEffect(() => {
+    checkFieldAvailability('phone', debouncedPhone, '/auth/check-phone', 8)
+  }, [debouncedPhone])
+
+  // Validate password
+  useEffect(() => {
+    if (!formData.password) {
+      setFieldValidation(prev => ({
+        ...prev,
+        password: { valid: null, message: '' }
+      }))
+    } else if (formData.password.length < 8) {
+      setFieldValidation(prev => ({
+        ...prev,
+        password: { valid: false, message: 'Password must be at least 8 characters' }
+      }))
+    } else {
+      const strength = validatePassword(formData.password)
+      setFieldValidation(prev => ({
+        ...prev,
+        password: { 
+          valid: strength !== 'weak', 
+          message: strength === 'strong' ? 'Strong password!' : strength === 'medium' ? 'Good password' : 'Weak password'
+        }
+      }))
+    }
+  }, [formData.password])
+
   const toggleCategory = (category) => {
     setFormData(prev => ({
       ...prev,
@@ -57,8 +148,6 @@ const Register = () => {
         : [...prev.preferredModes, mode]
     }))
   }
-
-  // ... (keep all your existing validation and mutation code)
 
   const registerMutation = useMutation({
     mutationFn: (data) => registerUser(data),
@@ -86,9 +175,35 @@ const Register = () => {
   const handleSubmit = (e) => {
     e.preventDefault()
     
-    // Validation...
+    // Validation
     if (!formData.name || !formData.email || !formData.phone || !formData.password) {
       toast.error('Please fill in all required fields')
+      return
+    }
+
+    // Check field validations
+    if (fieldValidation.name.valid === false) {
+      toast.error('This name is already taken')
+      return
+    }
+
+    if (fieldValidation.email.valid === false) {
+      toast.error('Email is already registered')
+      return
+    }
+
+    if (fieldValidation.phone.valid === false) {
+      toast.error('Phone number is already registered')
+      return
+    }
+
+    if (fieldValidation.name.valid === false) {
+      toast.error('Please enter a valid name')
+      return
+    }
+
+    if (fieldValidation.password.valid === false) {
+      toast.error('Please use a stronger password')
       return
     }
     
@@ -118,6 +233,44 @@ const Register = () => {
     }
   }
 
+  // Field validation indicator component
+  const FieldValidationIcon = ({ field }) => {
+    const validation = fieldValidation[field]
+    
+    if (validation.checking) {
+      return <LoaderIcon className="w-5 h-5 text-blue-500 animate-spin" />
+    }
+    
+    if (validation.valid === true) {
+      return <CheckCircle className="w-5 h-5 text-green-500" />
+    }
+    
+    if (validation.valid === false) {
+      return <XCircle className="w-5 h-5 text-red-500" />
+    }
+    
+    return null
+  }
+
+  const FieldMessage = ({ field }) => {
+    const validation = fieldValidation[field]
+    
+    if (!validation.message) return null
+    
+    const colorClass = validation.valid === true 
+      ? 'text-green-600' 
+      : validation.valid === false 
+      ? 'text-red-600' 
+      : 'text-blue-600'
+    
+    return (
+      <p className={`text-sm mt-1 ${colorClass} flex items-center gap-1`}>
+        {validation.valid === false && <AlertCircle className="w-4 h-4" />}
+        {validation.message}
+      </p>
+    )
+  }
+
   return (
     <DynamicBackground category="minimal" overlay={0.85}>
       <div className="min-h-screen py-12 px-4">
@@ -144,15 +297,25 @@ const Register = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 {t('name')} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="John Doe"
+                  className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all font-medium ${
+                    fieldValidation.name.valid === false ? 'border-red-300' : 
+                    fieldValidation.name.valid === true ? 'border-green-300' : 
+                    'border-gray-300'
+                  }`}
+                  required
+                />
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  <FieldValidationIcon field="name" />
+                </div>
+              </div>
+              <FieldMessage field="name" />
             </div>
 
             {/* Email Field */}
@@ -160,15 +323,25 @@ const Register = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 {t('email')} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your.email@example.com"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="your.email@example.com"
+                  className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all font-medium ${
+                    fieldValidation.email.valid === false ? 'border-red-300' : 
+                    fieldValidation.email.valid === true ? 'border-green-300' : 
+                    'border-gray-300'
+                  }`}
+                  required
+                />
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  <FieldValidationIcon field="email" />
+                </div>
+              </div>
+              <FieldMessage field="email" />
             </div>
 
             {/* Phone Field */}
@@ -176,15 +349,25 @@ const Register = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 {t('phone')} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="+95 9xxxxxxxxx or 09xxxxxxxxx"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+95 9xxxxxxxxx or 09xxxxxxxxx"
+                  className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all font-medium ${
+                    fieldValidation.phone.valid === false ? 'border-red-300' : 
+                    fieldValidation.phone.valid === true ? 'border-green-300' : 
+                    'border-gray-300'
+                  }`}
+                  required
+                />
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  <FieldValidationIcon field="phone" />
+                </div>
+              </div>
+              <FieldMessage field="phone" />
             </div>
 
             {/* Password Field */}
@@ -199,7 +382,11 @@ const Register = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Min. 8 characters"
-                  className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
+                  className={`w-full px-4 py-3 pr-12 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all font-medium ${
+                    fieldValidation.password.valid === false ? 'border-red-300' : 
+                    fieldValidation.password.valid === true ? 'border-green-300' : 
+                    'border-gray-300'
+                  }`}
                   required
                 />
                 <button
@@ -220,6 +407,7 @@ const Register = () => {
                       {passwordStrength === 'strong' ? 'Strong' : passwordStrength === 'medium' ? 'Medium' : 'Weak'}
                     </span>
                   </div>
+                  <FieldMessage field="password" />
                 </div>
               )}
             </div>
@@ -258,15 +446,10 @@ const Register = () => {
             <div className="space-y-6 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200">
               <div className="text-center">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  🤖 AI-Powered Personalization
+                  💡 Your Preferences
                 </h3>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  We prioritize your preferences using <span className="font-bold text-blue-600">Machine Learning</span> to recommend 
-                  opportunities that perfectly match your interests. Our AI recommendation engine analyzes your selections 
-                  and continuously learns from your interactions to provide increasingly accurate suggestions.
-                </p>
-                <p className="text-xs text-gray-500 mt-2 italic">
-                  💡 Select your preferences below - the more you choose, the better our AI performs!
+                <p className="text-sm text-gray-700">
+                  Help us show you the most relevant volunteer opportunities by selecting your interests below.
                 </p>
               </div>
 
@@ -328,7 +511,13 @@ const Register = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={registerMutation.isPending}
+              disabled={registerMutation.isPending || 
+                fieldValidation.name.valid === false ||
+                fieldValidation.email.valid === false || 
+                fieldValidation.phone.valid === false ||
+                fieldValidation.name.checking ||
+                fieldValidation.email.checking ||
+                fieldValidation.phone.checking}
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-xl hover:from-emerald-700 hover:to-teal-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-xl"
             >
               {registerMutation.isPending ? (
