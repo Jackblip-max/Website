@@ -1,10 +1,10 @@
+// backend/src/controllers/authController.js
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { Op } from 'sequelize'
 import { User, Volunteer, Organization } from '../models/index.js'
 import { sendVerificationEmail, sendWelcomeEmail } from '../services/emailService.js'
-import { validateGmailAccount, quickEmailCheck } from '../services/emailValidationService.js'
 import sequelize from '../config/database.js'
 
 // Generate JWT Token
