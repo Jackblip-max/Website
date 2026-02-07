@@ -15,19 +15,26 @@ router.get('/', authenticate, async (req, res) => {
     console.log('📚 User ID:', req.user.id);
     console.log('📚 User Email:', req.user.email);
 
-    // Find volunteer profile
-    const volunteer = await Volunteer.findOne({
+    // Find or create volunteer profile (organizations can also save opportunities)
+    let volunteer = await Volunteer.findOne({
       where: { userId: req.user.id }
     });
 
+    // If user doesn't have a volunteer profile (e.g., they're an organization), create one
     if (!volunteer) {
-      console.log('❌ No volunteer profile found');
-      return res.status(404).json({ 
-        message: 'Volunteer profile not found. Please complete your profile first.' 
+      console.log('⚠️ No volunteer profile found, creating one...');
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       });
+      console.log('✅ Volunteer profile created for user:', req.user.id);
     }
 
-    console.log('✅ Found volunteer profile - Volunteer ID:', volunteer.id);
+    console.log('✅ Found/created volunteer profile - Volunteer ID:', volunteer.id);
 
     // Get all saved opportunities with proper includes
     const savedOpportunities = await SavedOpportunity.findAll({
@@ -79,14 +86,19 @@ router.post('/:opportunityId', authenticate, async (req, res) => {
     console.log('💾 User ID:', req.user.id);
     console.log('💾 Opportunity ID:', opportunityId);
 
-    // Find volunteer profile
-    const volunteer = await Volunteer.findOne({
+    // Find or create volunteer profile
+    let volunteer = await Volunteer.findOne({
       where: { userId: req.user.id }
     });
 
     if (!volunteer) {
-      return res.status(404).json({ 
-        message: 'Volunteer profile not found. Please complete your profile first.' 
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       });
     }
 
@@ -191,14 +203,19 @@ router.delete('/:opportunityId', authenticate, async (req, res) => {
     console.log('🗑️ User ID:', req.user.id);
     console.log('🗑️ Opportunity ID:', opportunityId);
 
-    // Find volunteer profile
-    const volunteer = await Volunteer.findOne({
+    // Find or create volunteer profile
+    let volunteer = await Volunteer.findOne({
       where: { userId: req.user.id }
     });
 
     if (!volunteer) {
-      return res.status(404).json({ 
-        message: 'Volunteer profile not found' 
+      volunteer = await Volunteer.create({
+        userId: req.user.id,
+        education: 'undergraduate',
+        skills: '',
+        preferredCategories: [],
+        preferredModes: [],
+        notificationsEnabled: true
       });
     }
 
