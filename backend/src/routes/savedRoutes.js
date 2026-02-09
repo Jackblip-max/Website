@@ -128,12 +128,22 @@ router.post('/:opportunityId', authenticate, async (req, res) => {
       where: { userId: req.user.id }
     });
 
+    console.log('🔍 Ownership check:');
+    console.log('   User has organization:', !!userOrganization);
+    if (userOrganization) {
+      console.log('   User organization ID:', userOrganization.id);
+      console.log('   Opportunity organization ID:', opportunity.organizationId);
+      console.log('   Are they the same?', opportunity.organizationId === userOrganization.id);
+    }
+
     if (userOrganization && opportunity.organizationId === userOrganization.id) {
       console.log('❌ User trying to save their own organization opportunity');
       return res.status(403).json({ 
         message: 'You cannot save opportunities from your own organization' 
       });
     }
+
+    console.log('✅ Ownership check passed - user can save this opportunity');
 
     // Check if already saved
     const existingSave = await SavedOpportunity.findOne({
