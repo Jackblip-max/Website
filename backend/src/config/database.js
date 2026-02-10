@@ -17,6 +17,12 @@ export const sequelize = new Sequelize(
       min: 0,
       acquire: 30000,
       idle: 10000
+    },
+    // ✅ ADDED: Global model settings
+    define: {
+      underscored: false,  // ✅ CRITICAL: Use camelCase for column names
+      timestamps: true,
+      freezeTableName: false
     }
   }
 )
