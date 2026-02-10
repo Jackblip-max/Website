@@ -21,7 +21,7 @@ const OpportunityCard = ({ opportunity }) => {
       console.log('🔍 Saved status for opportunity', opportunity.id, ':', result)
       return result
     },
-    enabled: isAuthenticated && user?.role === 'volunteer',
+    enabled: isAuthenticated, // ✅ CHANGED: Remove role check, all users can save
     staleTime: 0, // Always fetch fresh
     cacheTime: 0, // Don't cache
     refetchOnMount: true,
@@ -153,10 +153,9 @@ const OpportunityCard = ({ opportunity }) => {
       return
     }
 
-    if (user?.role !== 'volunteer') {
-      toast.error('Only volunteers can save opportunities')
-      return
-    }
+    // ✅ REMOVED: Role check - backend will handle ownership validation
+    // All authenticated users (volunteers AND organizations) can save opportunities
+    // Backend prevents users from saving their own organization's opportunities
     
     // Call the appropriate mutation based on current state
     if (isSaved) {
