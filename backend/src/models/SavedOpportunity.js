@@ -10,6 +10,7 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
   volunteerId: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    field: 'volunteerId',  // ✅ ADDED: Explicitly specify column name
     references: {
       model: 'volunteers',
       key: 'id'
@@ -18,16 +19,16 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
   opportunityId: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    field: 'opportunityId',  // ✅ ADDED: Explicitly specify column name
     references: {
       model: 'opportunities',
       key: 'id'
     }
   }
-  // 🔥 REMOVED: savedAt field (doesn't exist in your database)
-  // Sequelize automatically adds createdAt and updatedAt
 }, {
   tableName: 'saved_opportunities',
-  timestamps: true  // This adds createdAt and updatedAt automatically
+  timestamps: true,
+  underscored: false 
 });
 
 // This function will be called by models/index.js
