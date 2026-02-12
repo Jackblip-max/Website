@@ -28,7 +28,7 @@ const SavedOpportunity = sequelize.define('SavedOpportunity', {
 }, {
   tableName: 'saved_opportunities',
   timestamps: true,
-  underscored: false 
+  underscored: false  // ✅ CRITICAL FIX: Tells Sequelize to use camelCase, not snake_case
 });
 
 // This function will be called by models/index.js
