@@ -22,7 +22,7 @@ const SavedOpportunities = () => {
       console.log('📚 Raw saved data:', result)
       return result
     },
-    enabled: isAuthenticated && user?.role === 'volunteer'
+    enabled: isAuthenticated  // ✅ FIXED: Remove volunteer-only check, all users can save
   })
 
   // Unsave mutation
