@@ -1,15 +1,18 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Building2, Users, Heart, User, Check, XCircle, Mail, AlertCircle, Edit, Clock, Award } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
 import { organizationService } from '../services/organizationService'
 import Loader from '../components/common/Loader'
 import CertificateModal from '../components/certificates/CertificateModal'
 
 const OrgDashboard = () => {
   const { t } = useLanguage()
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   
   // ⭐ Modal state
@@ -17,6 +20,20 @@ const OrgDashboard = () => {
     isOpen: false,
     applicant: null
   })
+
+  // ⭐ Check if user should be on this page
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      // If user doesn't have an organization, redirect to create one
+      if (!user?.organization) {
+        toast.error('You need to create an organization first')
+        navigate('/create-organization')
+      }
+    }
+  }, [authLoading, isAuthenticated, user, navigate])
+
+  // ⭐ Only enable queries if user is authenticated and has organization
+  const shouldFetchData = isAuthenticated && !authLoading && !!user?.organization
 
   // Fetch organization details
   const { data: organization, isLoading: orgLoading } = useQuery({
@@ -26,7 +43,9 @@ const OrgDashboard = () => {
       const result = await organizationService.getMyOrganization()
       console.log('✅ Organization data:', result)
       return result
-    }
+    },
+    enabled: shouldFetchData, // ⭐ Only fetch when safe
+    retry: 1
   })
 
   // Fetch organization stats
@@ -37,7 +56,9 @@ const OrgDashboard = () => {
       const result = await organizationService.getOrganizationStats()
       console.log('✅ Stats data:', result)
       return result
-    }
+    },
+    enabled: shouldFetchData, // ⭐ Only fetch when safe
+    retry: 1
   })
 
   // Fetch organization opportunities
@@ -48,7 +69,9 @@ const OrgDashboard = () => {
       const result = await organizationService.getOrganizationOpportunities()
       console.log('✅ Opportunities data:', result)
       return result
-    }
+    },
+    enabled: shouldFetchData, // ⭐ Only fetch when safe
+    retry: 1
   })
 
   // Fetch applicants for all opportunities
@@ -105,7 +128,7 @@ const OrgDashboard = () => {
         return []
       }
     },
-    enabled: !!opportunities && (opportunities?.data?.length > 0 || opportunities?.length > 0),
+    enabled: shouldFetchData && !!opportunities && (opportunities?.data?.length > 0 || opportunities?.length > 0), // ⭐ Only fetch when safe
     retry: 2
   })
 
@@ -184,8 +207,8 @@ const OrgDashboard = () => {
     })
   }
 
-  // Show loading state
-  if (statsLoading || oppsLoading || orgLoading) {
+  // Show loading state while checking auth or loading data
+  if (authLoading || statsLoading || oppsLoading || orgLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader />
@@ -337,7 +360,7 @@ const OrgDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-600 text-sm font-medium">{t('activeJobs')}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats?.activeJobs || 0}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats?.data?.activeJobs || 0}</p>
                 </div>
                 <Building2 className="w-12 h-12 text-blue-600 opacity-50" />
               </div>
@@ -346,7 +369,7 @@ const OrgDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-emerald-600 text-sm font-medium">{t('totalApplicants')}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats?.totalApplicants || 0}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats?.data?.totalApplicants || 0}</p>
                 </div>
                 <Users className="w-12 h-12 text-emerald-600 opacity-50" />
               </div>
@@ -355,7 +378,7 @@ const OrgDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-600 text-sm font-medium">{t('accepted')}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats?.accepted || 0}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats?.data?.accepted || 0}</p>
                 </div>
                 <Heart className="w-12 h-12 text-purple-600 opacity-50" />
               </div>
