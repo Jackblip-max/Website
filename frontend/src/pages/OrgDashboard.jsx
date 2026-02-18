@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { organizationService } from '../services/organizationService'
 import Loader from '../components/common/Loader'
 import CertificateModal from '../components/certificates/CertificateModal'
+import DynamicBackground from '../components/common/DynamicBackground'
 
 const OrgDashboard = () => {
   const { t } = useLanguage()
@@ -231,8 +232,8 @@ const OrgDashboard = () => {
   const logoUrl = getLogoUrl(orgData?.logo)
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
+    <DynamicBackground category="minimal" overlay={0.85}>
+      <div className="min-h-screen py-12 px-4">
         {/* Organization Details Card */}
         {orgData && (
           <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
@@ -500,7 +501,7 @@ const OrgDashboard = () => {
         onSubmit={handleSubmitCertificate}
         isLoading={certificateMutation.isPending}
       />
-    </div>
+    </DynamicBackground>
   )
 }
 
