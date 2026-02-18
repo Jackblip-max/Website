@@ -6,6 +6,8 @@ import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
 import { Edit2, Save, X, Building2, Plus } from 'lucide-react'
+import DynamicBackground from '../components/common/DynamicBackground'
+
 
 const Profile = () => {
   const { t } = useLanguage()
@@ -104,8 +106,8 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <DynamicBackground category="minimal" overlay={0.85}>
+      <div className="min-h-screen py-12 px-4">
         {/* Profile Header Card */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg p-8 mb-6 text-white">
           <div className="flex items-center space-x-6">
@@ -352,7 +354,7 @@ const Profile = () => {
           </div>
         )}
       </div>
-    </div>
+      </DynamicBackground>
   )
 }
 
