@@ -105,9 +105,11 @@ const Profile = () => {
     )
   }
 
-  return (
-    <DynamicBackground category="minimal" overlay={0.85}>
-      <div className="min-h-screen py-12 px-4">
+ return (
+  <DynamicBackground category="minimal" overlay={0.85}>
+    <div className="min-h-screen py-12 px-4">
+      <div className="max-w-4xl mx-auto">  {/* ✅ ADDED THIS LINE */}
+        
         {/* Profile Header Card */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl shadow-lg p-8 mb-6 text-white">
           <div className="flex items-center space-x-6">
@@ -353,9 +355,11 @@ const Profile = () => {
             </Link>
           </div>
         )}
-      </div>
-      </DynamicBackground>
-  )
+        
+      </div>  {/* ✅ CLOSE MAX-WIDTH CONTAINER */}
+    </div>
+  </DynamicBackground>
+)
 }
 
 export default Profile
