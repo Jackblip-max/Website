@@ -15,7 +15,7 @@ export const getDashboardStats = async (req, res) => {
       totalApplications
     ] = await Promise.all([
       User.count(),
-      Organization.count(),
+      Organization.count({ where: { verificationStatus: 'approved' } }), // ✅ FIXED: Only count approved
       Organization.count({ where: { verificationStatus: 'pending' } }),
       Organization.count({ where: { verificationStatus: 'approved' } }),
       Opportunity.count(),
