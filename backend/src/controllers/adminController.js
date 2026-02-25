@@ -1,6 +1,6 @@
 import { User, Organization, Opportunity, Application, AdminLog } from '../models/index.js'
 import { logAdminAction } from '../middleware/adminAuth.js'
-import { sendOrganizationApprovalEmail, sendOrganizationRejectionEmail } from '../services/emailService.js'
+import { sendOrganizationApprovalEmail, sendOrganizationRejectionEmail, sendOrganizationDeletionEmail } from '../services/emailService.js'
 import { Op } from 'sequelize'
 
 // Get admin dashboard stats
@@ -15,7 +15,7 @@ export const getDashboardStats = async (req, res) => {
       totalApplications
     ] = await Promise.all([
       User.count(),
-      Organization.count({ where: { verificationStatus: 'approved' } }), 
+      Organization.count({ where: { verificationStatus: 'approved' } }), // ✅ Only count approved
       Organization.count({ where: { verificationStatus: 'pending' } }),
       Organization.count({ where: { verificationStatus: 'approved' } }),
       Opportunity.count(),
@@ -133,12 +133,6 @@ export const approveOrganization = async (req, res) => {
       verificationReason: message || 'Organization verified and approved'
     })
 
-    // Update user role to organization
-    await User.update(
-      { role: 'organization' },
-      { where: { id: organization.userId } }
-    )
-
     // Log admin action
     await logAdminAction(
       req.adminId,
@@ -248,6 +242,87 @@ export const rejectOrganization = async (req, res) => {
   }
 }
 
+// ⭐ Delete organization (keep user account intact)
+export const deleteOrganization = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { reason } = req.body
+
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Deletion reason is required (minimum 10 characters)' 
+      })
+    }
+
+    console.log('🗑️ Admin deleting organization:', id)
+
+    const organization = await Organization.findByPk(id, {
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'name', 'email']
+      }]
+    })
+
+    if (!organization) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Organization not found' 
+      })
+    }
+
+    const orgName = organization.name
+    const userName = organization.user?.name
+    const userEmail = organization.user?.email
+
+    // Log admin action before deletion
+    await logAdminAction(
+      req.adminId,
+      'DELETE_ORGANIZATION',
+      'organization',
+      organization.id,
+      { 
+        organizationName: orgName, 
+        userName: userName,
+        userId: organization.userId,
+        reason: reason
+      },
+      req.ip
+    )
+
+    // Delete the organization
+    await organization.destroy()
+
+    // Send deletion notification email
+    try {
+      await sendOrganizationDeletionEmail(
+        userEmail,
+        userName,
+        orgName,
+        reason
+      )
+      console.log('✅ Deletion notification email sent')
+    } catch (emailError) {
+      console.error('Failed to send deletion email:', emailError)
+    }
+
+    console.log('✅ Organization deleted. User account remains active.')
+
+    res.json({
+      success: true,
+      message: 'Organization deleted successfully. User account remains active and can still volunteer.'
+    })
+  } catch (error) {
+    console.error('❌ Delete organization error:', error)
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to delete organization',
+      error: error.message 
+    })
+  }
+}
+
 // Get all users
 export const getAllUsers = async (req, res) => {
   try {
@@ -292,7 +367,7 @@ export const getAllUsers = async (req, res) => {
   }
 }
 
-// Delete user
+// Delete user (cascade deletes their organization too)
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params
@@ -306,7 +381,11 @@ export const deleteUser = async (req, res) => {
     }
 
     const user = await User.findByPk(id, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      include: [{
+        model: Organization,
+        as: 'organization'
+      }]
     })
 
     if (!user) {
@@ -323,13 +402,38 @@ export const deleteUser = async (req, res) => {
       })
     }
 
+    // If user has an organization, delete it first (cascade)
+    if (user.organization) {
+      console.log('🗑️ User has organization, deleting organization first...')
+      
+      // Send deletion email for organization
+      try {
+        await sendOrganizationDeletionEmail(
+          user.email,
+          user.name,
+          user.organization.name,
+          reason || 'Your account has been removed by administrator'
+        )
+      } catch (emailError) {
+        console.error('Failed to send organization deletion email:', emailError)
+      }
+      
+      await user.organization.destroy()
+    }
+
     // Log admin action before deletion
     await logAdminAction(
       req.adminId,
       'DELETE_USER',
       'user',
       user.id,
-      { userName: user.name, userEmail: user.email, reason },
+      { 
+        userName: user.name, 
+        userEmail: user.email, 
+        hadOrganization: !!user.organization,
+        organizationName: user.organization?.name,
+        reason 
+      },
       req.ip
     )
 
@@ -337,7 +441,7 @@ export const deleteUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User deleted successfully'
+      message: 'User deleted successfully' + (user.organization ? ' (including their organization)' : '')
     })
   } catch (error) {
     console.error('Delete user error:', error)
