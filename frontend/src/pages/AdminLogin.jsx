@@ -3,36 +3,32 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Shield, Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
 import DynamicBackground from '../components/common/DynamicBackground'
+import { adminAuthService } from '../services/adminAuthService'
 
 const AdminLogin = () => {
   const navigate = useNavigate()
-  const { login } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
 
+  // ⭐ FIXED: Use adminAuthService instead of regular login
   const loginMutation = useMutation({
     mutationFn: async (data) => {
-      const result = await login(data)
+      console.log('🔐 Admin login attempt...')
+      const result = await adminAuthService.login(data.email, data.password)
       return result
     },
     onSuccess: (response) => {
-      // Verify this is actually an admin
-      if (response.user?.role !== 'admin') {
-        toast.error('Access denied. Admin credentials required.')
-        localStorage.removeItem('token')
-        return
-      }
-      
+      console.log('✅ Admin login successful:', response)
       toast.success('Admin login successful!')
       navigate('/admin')
     },
     onError: (error) => {
-      const message = error.response?.data?.message || 'Login failed'
+      console.error('❌ Admin login error:', error)
+      const message = error.response?.data?.message || 'Invalid admin credentials'
       toast.error(message)
     }
   })
