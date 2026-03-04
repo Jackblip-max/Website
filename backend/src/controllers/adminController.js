@@ -2,6 +2,8 @@ import { User, Organization, Opportunity, Application, AdminLog } from '../model
 import { logAdminAction } from '../middleware/adminAuth.js'
 import { sendOrganizationApprovalEmail, sendOrganizationRejectionEmail, sendOrganizationDeletionEmail } from '../services/emailService.js'
 import { Op } from 'sequelize'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
 
 // Get admin dashboard stats
 export const getDashboardStats = async (req, res) => {
