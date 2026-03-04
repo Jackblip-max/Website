@@ -1,35 +1,32 @@
 import express from 'express'
+import { adminAuth } from '../middleware/adminAuth.js'
 import {
+  adminLogin,  // ⭐ NEW
   getDashboardStats,
   getPendingOrganizations,
   getAllOrganizations,
   approveOrganization,
   rejectOrganization,
+  deleteOrganization,  // ⭐ NEW
   getAllUsers,
   deleteUser,
   getAdminLogs
 } from '../controllers/adminController.js'
-import { requireAdmin } from '../middleware/adminAuth.js'
 
 const router = express.Router()
 
-// All routes require admin authentication
-router.use(requireAdmin)
+// ⭐ Public route - no auth needed
+router.post('/login', adminLogin)
 
-// Dashboard stats
-router.get('/stats', getDashboardStats)
-
-// Organization management
-router.get('/organizations/pending', getPendingOrganizations)
-router.get('/organizations', getAllOrganizations)
-router.put('/organizations/:id/approve', approveOrganization)
-router.put('/organizations/:id/reject', rejectOrganization)
-
-// User management
-router.get('/users', getAllUsers)
-router.delete('/users/:id', deleteUser)
-
-// Activity logs
-router.get('/logs', getAdminLogs)
+// ⭐ Protected routes - need admin auth
+router.get('/stats', adminAuth, getDashboardStats)
+router.get('/organizations/pending', adminAuth, getPendingOrganizations)
+router.get('/organizations', adminAuth, getAllOrganizations)
+router.post('/organizations/:id/approve', adminAuth, approveOrganization)
+router.post('/organizations/:id/reject', adminAuth, rejectOrganization)
+router.delete('/organizations/:id', adminAuth, deleteOrganization)  // ⭐ NEW
+router.get('/users', adminAuth, getAllUsers)
+router.delete('/users/:id', adminAuth, deleteUser)
+router.get('/logs', adminAuth, getAdminLogs)
 
 export default router
