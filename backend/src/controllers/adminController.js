@@ -5,6 +5,87 @@ import { Op } from 'sequelize'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body
+
+    console.log('🔐 Admin login attempt:', { email })
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      })
+    }
+
+    // Find admin user
+    const admin = await User.findOne({
+      where: { 
+        email,
+        role: 'admin' // ⭐ Must be admin
+      }
+    })
+
+    if (!admin) {
+      console.log('❌ Admin not found or user is not admin')
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      })
+    }
+
+    console.log('✅ Admin found:', admin.id)
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, admin.password)
+    console.log('🔐 Password valid:', isValidPassword)
+
+    if (!isValidPassword) {
+      console.log('❌ Invalid password')
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      })
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        id: admin.id,  // ⭐ Use 'id' to match your middleware
+        email: admin.email,
+        role: 'admin'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    console.log('✅ Admin login successful')
+
+    // Send response
+    res.json({
+      success: true,
+      message: 'Admin login successful',
+      token,
+      user: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        isVerified: admin.isVerified
+      }
+    })
+  } catch (error) {
+    console.error('❌ Admin login error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: error.message
+    })
+  }
+}
+
 // Get admin dashboard stats
 export const getDashboardStats = async (req, res) => {
   try {
