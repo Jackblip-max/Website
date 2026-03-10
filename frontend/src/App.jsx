@@ -7,6 +7,7 @@ import { LanguageProvider } from './context/LanguageContext'
 
 // Import the new ProtectedRoute
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 
 // Layouts
 import MainLayout from './layouts/MainLayout'
