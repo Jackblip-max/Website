@@ -20,35 +20,25 @@ const Login = () => {
   const loginMutation = useMutation({
     mutationFn: async (data) => {
       console.log('🔐 Attempting login with:', { email: data.email, password: '***' })
-      
-      try {
-        const result = await login(data)
-        console.log('🔐 Login function returned:', result)
-        return result
-      } catch (error) {
-        console.error('🔐 Login function threw error:', error)
-        throw error
-      }
+      const result = await login(data)
+      console.log('🔐 Login function returned:', result)
+      return result
     },
     onSuccess: async (response) => {
       console.log('✅ Login successful - Response:', response)
-      console.log('✅ User data:', response?.user)
-      
       toast.success('Login successful!')
-      
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Redirect to browse page
       navigate('/browse')
     },
     onError: (error) => {
-      console.error('❌ Login error FULL:', error)
-      
+      console.error('❌ Login error:', error)
+
       const errorData = error.response?.data
+      const status = error.response?.status
       const message = errorData?.message || error.message || 'Login failed'
-      
-      // Check if it's a verification error
-      if (errorData?.needsVerification || error.response?.status === 403) {
+
+      // Only show the "Email Not Verified" toast for actual unverified-email errors
+      if (errorData?.needsVerification === true) {
         toast((toastInstance) => (
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-2">
@@ -91,6 +81,7 @@ const Login = () => {
           },
         })
       } else {
+        // Generic error — covers wrong password, non-existent email, admin accounts, etc.
         toast.error(message)
       }
     }
@@ -104,11 +95,10 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     console.log('📝 Form submitted')
-    
+
     if (!formData.email || !formData.password) {
-      console.log('⚠️ Validation failed: Missing fields')
       toast.error('Please fill in all fields')
       return
     }
@@ -120,12 +110,12 @@ const Login = () => {
     }
 
     console.log('🚀 Calling login mutation...')
-    
+
     try {
       await loginMutation.mutateAsync(formData)
-      console.log('📝 Mutation completed successfully')
     } catch (error) {
-      console.log('📝 Mutation failed:', error.message)
+      // onError already handles the toast — nothing to do here
+      console.log('📝 Mutation failed (handled by onError):', error.message)
     }
   }
 
@@ -139,7 +129,7 @@ const Login = () => {
     <DynamicBackground category="minimal" overlay={0.8}>
       <div className="min-h-screen flex items-center justify-center py-12 px-4">
         {/* Back Button */}
-        <Link 
+        <Link
           to="/"
           className="absolute top-8 left-8 inline-flex items-center text-white hover:text-emerald-200 transition-colors z-10"
         >
@@ -155,10 +145,10 @@ const Login = () => {
             <h2 className="text-4xl font-bold text-gray-900 mb-2">{t('login')}</h2>
             <p className="text-gray-600 font-medium">Welcome back! Sign in to continue</p>
           </div>
-          
+
           {/* Google Login Button */}
           <div className="mb-6">
-            <button 
+            <button
               onClick={handleGoogleLogin}
               type="button"
               className="w-full flex items-center justify-center space-x-3 bg-white border-2 border-gray-300 rounded-xl py-4 hover:bg-gray-50 transition-all hover:shadow-xl transform hover:scale-[1.02]"
