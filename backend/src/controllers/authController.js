@@ -218,8 +218,8 @@ export const register = async (req, res) => {
       password, 
       education,
       skills,
-      preferredCategories,  // NEW: User preferences
-      preferredModes        // NEW: User preferences
+      preferredCategories,
+      preferredModes
     } = req.body
 
     if (!name || !email || !phone || !password) {
@@ -337,9 +337,6 @@ export const register = async (req, res) => {
     const verificationToken = generateVerificationToken()
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-    console.log('📧 Generated verification token:', verificationToken)
-    console.log('📧 Token expires at:', verificationExpires)
-
     const user = await User.create({
       name: trimmedName,
       email: email.trim().toLowerCase(),
@@ -352,15 +349,8 @@ export const register = async (req, res) => {
     })
 
     console.log('✅ User created successfully:', user.id)
-    console.log('📧 Verification token saved:', user.verificationToken ? 'Yes' : 'No')
-
-    const savedUser = await User.findByPk(user.id)
-    console.log('📧 Token verification check - Saved in DB:', savedUser.verificationToken ? 'Yes' : 'No')
 
     try {
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
-      console.log('📧 Verification URL:', verificationUrl)
-      
       await sendVerificationEmail(user.email, user.name, verificationToken)
       console.log('✅ Verification email sent successfully to:', user.email)
     } catch (emailError) {
@@ -374,21 +364,16 @@ export const register = async (req, res) => {
       })
     }
 
-    // ⭐ NEW: Create volunteer profile with preferences
     await Volunteer.create({
       userId: user.id,
       education: education || 'undergraduate',
       skills: skills || '',
-      preferredCategories: preferredCategories || [],  // NEW: Save preferences
-      preferredModes: preferredModes || [],            // NEW: Save preferences
+      preferredCategories: preferredCategories || [],
+      preferredModes: preferredModes || [],
       notificationsEnabled: true
     })
 
     console.log('✅ Volunteer profile created successfully with preferences')
-    console.log('📊 Preferences saved:', {
-      categories: preferredCategories || [],
-      modes: preferredModes || []
-    })
 
     const token = generateToken(user.id)
 
@@ -402,8 +387,8 @@ export const register = async (req, res) => {
       volunteer: {
         education: education || 'undergraduate',
         skills: skills || '',
-        preferredCategories: preferredCategories || [],  // NEW: Include in response
-        preferredModes: preferredModes || [],            // NEW: Include in response
+        preferredCategories: preferredCategories || [],
+        preferredModes: preferredModes || [],
         notificationsEnabled: true
       }
     }
@@ -416,7 +401,6 @@ export const register = async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Register error details:', error)
-    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Registration failed. Please try again.',
@@ -456,6 +440,16 @@ export const login = async (req, res) => {
       return res.status(401).json({ 
         success: false,
         message: 'Invalid email or password' 
+      })
+    }
+
+    // ✅ Block admin accounts from the user login endpoint.
+    // Return the same generic 401 as "user not found" — no information leakage.
+    if (user.role === 'admin') {
+      console.log('❌ Admin account attempted user login:', user.email)
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
       })
     }
 
@@ -512,8 +506,8 @@ export const login = async (req, res) => {
         id: user.volunteer.id,
         education: user.volunteer.education,
         skills: user.volunteer.skills,
-        preferredCategories: user.volunteer.preferredCategories || [],  // NEW: Include preferences
-        preferredModes: user.volunteer.preferredModes || [],            // NEW: Include preferences
+        preferredCategories: user.volunteer.preferredCategories || [],
+        preferredModes: user.volunteer.preferredModes || [],
         notificationsEnabled: user.volunteer.notificationsEnabled
       } : null,
       organization: user.organization ? {
@@ -536,7 +530,6 @@ export const login = async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Login error:', error)
-    console.error('Error stack:', error.stack)
     res.status(500).json({ 
       success: false,
       message: 'Login failed. Please try again.',
@@ -567,9 +560,6 @@ export const getProfile = async (req, res) => {
       })
     }
 
-    console.log('✅ User found:', user.email)
-    console.log('📊 Has organization:', !!user.organization)
-
     res.json({
       success: true,
       id: user.id,
@@ -584,8 +574,8 @@ export const getProfile = async (req, res) => {
         id: user.volunteer.id,
         education: user.volunteer.education,
         skills: user.volunteer.skills,
-        preferredCategories: user.volunteer.preferredCategories || [],  // NEW
-        preferredModes: user.volunteer.preferredModes || [],            // NEW
+        preferredCategories: user.volunteer.preferredCategories || [],
+        preferredModes: user.volunteer.preferredModes || [],
         notificationsEnabled: user.volunteer.notificationsEnabled
       } : null,
       organization: user.organization ? {
@@ -619,8 +609,8 @@ export const updateProfile = async (req, res) => {
       education, 
       skills, 
       notificationsEnabled,
-      preferredCategories,  // NEW: Allow updating preferences
-      preferredModes        // NEW: Allow updating preferences
+      preferredCategories,
+      preferredModes
     } = req.body
 
     const user = await User.findByPk(req.user.id)
@@ -664,7 +654,6 @@ export const updateProfile = async (req, res) => {
           notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : volunteer.notificationsEnabled
         }
 
-        // NEW: Update preferences if provided
         if (preferredCategories !== undefined) {
           updateData.preferredCategories = preferredCategories
         }
@@ -718,10 +707,7 @@ export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params
 
-    console.log('📧 Email verification attempt with token:', token)
-
     if (!token) {
-      console.log('❌ No token provided')
       return res.status(400).json({
         success: false,
         message: 'Verification token is required'
@@ -733,17 +719,13 @@ export const verifyEmail = async (req, res) => {
     })
 
     if (!user) {
-      console.log('❌ No user found with token:', token)
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired verification token. The token may have already been used or has expired.'
       })
     }
 
-    console.log('✅ User found:', user.email)
-
     if (user.isVerified) {
-      console.log('ℹ️ User already verified:', user.email)
       return res.json({
         success: true,
         message: 'Email already verified! You can login now.'
@@ -751,7 +733,6 @@ export const verifyEmail = async (req, res) => {
     }
 
     if (user.verificationExpires && new Date() > user.verificationExpires) {
-      console.log('❌ Token expired for user:', user.email)
       return res.status(400).json({
         success: false,
         message: 'Verification token has expired. Please request a new verification email.',
@@ -764,11 +745,8 @@ export const verifyEmail = async (req, res) => {
     user.verificationExpires = null
     await user.save()
 
-    console.log('✅ User verified successfully:', user.email)
-
     try {
       await sendWelcomeEmail(user.email, user.name)
-      console.log('✅ Welcome email sent to:', user.email)
     } catch (emailError) {
       console.error('⚠️ Failed to send welcome email:', emailError)
     }
@@ -847,9 +825,6 @@ export const resendVerification = async (req, res) => {
 // @access  Private
 export const completeProfile = async (req, res) => {
   try {
-    console.log('Complete profile request:', req.body)
-    console.log('User from token:', req.user)
-
     const { phone, education } = req.body
 
     if (!phone) {
@@ -879,22 +854,18 @@ export const completeProfile = async (req, res) => {
     user.phone = cleanPhone
     await user.save()
 
-    console.log('User updated:', user.id)
-
     let volunteer = await Volunteer.findOne({ where: { userId: user.id } })
     
     if (!volunteer) {
-      console.log('Creating new volunteer profile')
       volunteer = await Volunteer.create({
         userId: user.id,
         education: education || 'undergraduate',
         skills: '',
-        preferredCategories: [],  // NEW: Initialize empty preferences
-        preferredModes: [],        // NEW: Initialize empty preferences
+        preferredCategories: [],
+        preferredModes: [],
         notificationsEnabled: true
       })
     } else {
-      console.log('Updating existing volunteer profile')
       await volunteer.update({
         education: education || volunteer.education
       })
@@ -907,8 +878,6 @@ export const completeProfile = async (req, res) => {
       ],
       attributes: { exclude: ['password'] }
     })
-
-    console.log('Profile completed successfully for user:', updatedUser.id)
 
     res.json({
       success: true,
