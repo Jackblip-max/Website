@@ -5,65 +5,38 @@ import { Op } from 'sequelize'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
-
 export const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body
 
-    console.log('🔐 Admin login attempt:', { email })
+    console.log('\n🔐 ===== ADMIN LOGIN ATTEMPT =====')
+    console.log('📧 Email:', email)
 
-    // Validate input
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required'
-      })
+      return res.status(400).json({ success: false, message: 'Email and password are required' })
     }
 
-    // Find admin user
     const admin = await User.findOne({
-      where: { 
-        email,
-        role: 'admin' // ⭐ Must be admin
-      }
+      where: { email: email.trim().toLowerCase(), role: 'admin' }
     })
 
     if (!admin) {
-      console.log('❌ Admin not found or user is not admin')
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      })
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    console.log('✅ Admin found:', admin.id)
-
-    // Check password
     const isValidPassword = await bcrypt.compare(password, admin.password)
-    console.log('🔐 Password valid:', isValidPassword)
-
     if (!isValidPassword) {
-      console.log('❌ Invalid password')
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      })
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    // Generate JWT token
     const token = jwt.sign(
-      { 
-        id: admin.id,  // ⭐ Use 'id' to match your middleware
-        email: admin.email,
-        role: 'admin'
-      },
+      { id: admin.id, email: admin.email, role: 'admin' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     )
 
-    console.log('✅ Admin login successful')
+    console.log('✅ ADMIN LOGIN SUCCESSFUL!')
 
-    // Send response
     res.json({
       success: true,
       message: 'Admin login successful',
@@ -78,11 +51,7 @@ export const adminLogin = async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Admin login error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      error: error.message
-    })
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message })
   }
 }
 
@@ -97,32 +66,28 @@ export const getDashboardStats = async (req, res) => {
       totalOpportunities,
       totalApplications
     ] = await Promise.all([
-      User.count(),
-      Organization.count({ where: { verificationStatus: 'approved' } }), // ✅ Only count approved
+      // ✅ Exclude admin accounts from user count
+      User.count({ where: { role: { [Op.ne]: 'admin' } } }),
+      Organization.count(),
       Organization.count({ where: { verificationStatus: 'pending' } }),
       Organization.count({ where: { verificationStatus: 'approved' } }),
       Opportunity.count(),
       Application.count()
     ])
 
+    // ✅ Return flat object — frontend reads response.totalUsers directly
     res.json({
       success: true,
-      data: {
-        totalUsers,
-        totalOrganizations,
-        pendingOrganizations,
-        approvedOrganizations,
-        totalOpportunities,
-        totalApplications
-      }
+      totalUsers,
+      totalOrganizations,
+      pendingOrganizations,
+      approvedOrganizations,
+      totalOpportunities,
+      totalApplications
     })
   } catch (error) {
     console.error('Get dashboard stats error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get dashboard stats',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to get dashboard stats', error: error.message })
   }
 }
 
@@ -139,17 +104,11 @@ export const getPendingOrganizations = async (req, res) => {
       order: [['createdAt', 'ASC']]
     })
 
-    res.json({
-      success: true,
-      data: organizations
-    })
+    // ✅ Return flat array — frontend does Array.isArray(response)
+    res.json(organizations)
   } catch (error) {
     console.error('Get pending organizations error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get pending organizations',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to get pending organizations', error: error.message })
   }
 }
 
@@ -158,7 +117,7 @@ export const getAllOrganizations = async (req, res) => {
   try {
     const { status } = req.query
     const where = {}
-    
+
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       where.verificationStatus = status
     }
@@ -173,17 +132,10 @@ export const getAllOrganizations = async (req, res) => {
       order: [['createdAt', 'DESC']]
     })
 
-    res.json({
-      success: true,
-      data: organizations
-    })
+    res.json({ success: true, data: organizations })
   } catch (error) {
     console.error('Get all organizations error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get organizations',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to get organizations', error: error.message })
   }
 }
 
@@ -194,18 +146,11 @@ export const approveOrganization = async (req, res) => {
     const { message } = req.body
 
     const organization = await Organization.findByPk(id, {
-      include: [{
-        model: User,
-        as: 'user',
-        attributes: ['id', 'name', 'email']
-      }]
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }]
     })
 
     if (!organization) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Organization not found' 
-      })
+      return res.status(404).json({ success: false, message: 'Organization not found' })
     }
 
     await organization.update({
@@ -216,39 +161,19 @@ export const approveOrganization = async (req, res) => {
       verificationReason: message || 'Organization verified and approved'
     })
 
-    // Log admin action
-    await logAdminAction(
-      req.adminId,
-      'APPROVE_ORGANIZATION',
-      'organization',
-      organization.id,
-      { organizationName: organization.name, message },
-      req.ip
-    )
+    await logAdminAction(req.adminId, 'APPROVE_ORGANIZATION', 'organization', organization.id,
+      { organizationName: organization.name, message }, req.ip)
 
-    // Send approval email
     try {
-      await sendOrganizationApprovalEmail(
-        organization.user.email,
-        organization.user.name,
-        organization.name
-      )
+      await sendOrganizationApprovalEmail(organization.user.email, organization.user.name, organization.name)
     } catch (emailError) {
       console.error('Failed to send approval email:', emailError)
     }
 
-    res.json({
-      success: true,
-      message: 'Organization approved successfully',
-      data: organization
-    })
+    res.json({ success: true, message: 'Organization approved successfully', data: organization })
   } catch (error) {
     console.error('Approve organization error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to approve organization',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to approve organization', error: error.message })
   }
 }
 
@@ -259,25 +184,15 @@ export const rejectOrganization = async (req, res) => {
     const { reason } = req.body
 
     if (!reason || reason.trim().length < 10) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Rejection reason is required (minimum 10 characters)' 
-      })
+      return res.status(400).json({ success: false, message: 'Rejection reason is required (minimum 10 characters)' })
     }
 
     const organization = await Organization.findByPk(id, {
-      include: [{
-        model: User,
-        as: 'user',
-        attributes: ['id', 'name', 'email']
-      }]
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }]
     })
 
     if (!organization) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Organization not found' 
-      })
+      return res.status(404).json({ success: false, message: 'Organization not found' })
     }
 
     await organization.update({
@@ -288,121 +203,59 @@ export const rejectOrganization = async (req, res) => {
       verificationReason: reason
     })
 
-    // Log admin action
-    await logAdminAction(
-      req.adminId,
-      'REJECT_ORGANIZATION',
-      'organization',
-      organization.id,
-      { organizationName: organization.name, reason },
-      req.ip
-    )
+    await logAdminAction(req.adminId, 'REJECT_ORGANIZATION', 'organization', organization.id,
+      { organizationName: organization.name, reason }, req.ip)
 
-    // Send rejection email
     try {
-      await sendOrganizationRejectionEmail(
-        organization.user.email,
-        organization.user.name,
-        organization.name,
-        reason
-      )
+      await sendOrganizationRejectionEmail(organization.user.email, organization.user.name, organization.name, reason)
     } catch (emailError) {
       console.error('Failed to send rejection email:', emailError)
     }
 
-    res.json({
-      success: true,
-      message: 'Organization rejected',
-      data: organization
-    })
+    res.json({ success: true, message: 'Organization rejected', data: organization })
   } catch (error) {
     console.error('Reject organization error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to reject organization',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to reject organization', error: error.message })
   }
 }
 
-// ⭐ Delete organization (keep user account intact)
+// Delete organization (keep user account intact)
 export const deleteOrganization = async (req, res) => {
   try {
     const { id } = req.params
     const { reason } = req.body
 
     if (!reason || reason.trim().length < 10) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Deletion reason is required (minimum 10 characters)' 
-      })
+      return res.status(400).json({ success: false, message: 'Deletion reason is required (minimum 10 characters)' })
     }
 
-    console.log('🗑️ Admin deleting organization:', id)
-
     const organization = await Organization.findByPk(id, {
-      include: [{
-        model: User,
-        as: 'user',
-        attributes: ['id', 'name', 'email']
-      }]
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }]
     })
 
     if (!organization) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Organization not found' 
-      })
+      return res.status(404).json({ success: false, message: 'Organization not found' })
     }
 
     const orgName = organization.name
     const userName = organization.user?.name
     const userEmail = organization.user?.email
 
-    // Log admin action before deletion
-    await logAdminAction(
-      req.adminId,
-      'DELETE_ORGANIZATION',
-      'organization',
-      organization.id,
-      { 
-        organizationName: orgName, 
-        userName: userName,
-        userId: organization.userId,
-        reason: reason
-      },
-      req.ip
-    )
+    await logAdminAction(req.adminId, 'DELETE_ORGANIZATION', 'organization', organization.id,
+      { organizationName: orgName, userName, userId: organization.userId, reason }, req.ip)
 
-    // Delete the organization
     await organization.destroy()
 
-    // Send deletion notification email
     try {
-      await sendOrganizationDeletionEmail(
-        userEmail,
-        userName,
-        orgName,
-        reason
-      )
-      console.log('✅ Deletion notification email sent')
+      await sendOrganizationDeletionEmail(userEmail, userName, orgName, reason)
     } catch (emailError) {
       console.error('Failed to send deletion email:', emailError)
     }
 
-    console.log('✅ Organization deleted. User account remains active.')
-
-    res.json({
-      success: true,
-      message: 'Organization deleted successfully. User account remains active and can still volunteer.'
-    })
+    res.json({ success: true, message: 'Organization deleted successfully. User account remains active and can still volunteer.' })
   } catch (error) {
     console.error('❌ Delete organization error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to delete organization',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to delete organization', error: error.message })
   }
 }
 
@@ -411,7 +264,7 @@ export const getAllUsers = async (req, res) => {
   try {
     const { role, search } = req.query
     const where = {}
-    
+
     if (role && ['volunteer', 'organization', 'admin'].includes(role)) {
       where.role = role
     }
@@ -426,27 +279,19 @@ export const getAllUsers = async (req, res) => {
     const users = await User.findAll({
       where,
       attributes: { exclude: ['password'] },
-      include: [
-        { 
-          model: Organization, 
-          as: 'organization',
-          attributes: ['id', 'name', 'verificationStatus', 'isVerified']
-        }
-      ],
+      include: [{
+        model: Organization,
+        as: 'organization',
+        attributes: ['id', 'name', 'verificationStatus', 'isVerified']
+      }],
       order: [['createdAt', 'DESC']]
     })
 
-    res.json({
-      success: true,
-      data: users
-    })
+    // ✅ Return flat array — frontend does Array.isArray(response)
+    res.json(users)
   } catch (error) {
     console.error('Get all users error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get users',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to get users', error: error.message })
   }
 }
 
@@ -457,68 +302,35 @@ export const deleteUser = async (req, res) => {
     const { reason } = req.body
 
     if (parseInt(id) === req.adminId) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Cannot delete your own admin account' 
-      })
+      return res.status(400).json({ success: false, message: 'Cannot delete your own admin account' })
     }
 
     const user = await User.findByPk(id, {
       attributes: { exclude: ['password'] },
-      include: [{
-        model: Organization,
-        as: 'organization'
-      }]
+      include: [{ model: Organization, as: 'organization' }]
     })
 
     if (!user) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      })
+      return res.status(404).json({ success: false, message: 'User not found' })
     }
 
     if (user.role === 'admin') {
-      return res.status(403).json({ 
-        success: false,
-        message: 'Cannot delete admin users' 
-      })
+      return res.status(403).json({ success: false, message: 'Cannot delete admin users' })
     }
 
-    // If user has an organization, delete it first (cascade)
     if (user.organization) {
-      console.log('🗑️ User has organization, deleting organization first...')
-      
-      // Send deletion email for organization
       try {
-        await sendOrganizationDeletionEmail(
-          user.email,
-          user.name,
-          user.organization.name,
-          reason || 'Your account has been removed by administrator'
-        )
+        await sendOrganizationDeletionEmail(user.email, user.name, user.organization.name,
+          reason || 'Your account has been removed by administrator')
       } catch (emailError) {
         console.error('Failed to send organization deletion email:', emailError)
       }
-      
       await user.organization.destroy()
     }
 
-    // Log admin action before deletion
-    await logAdminAction(
-      req.adminId,
-      'DELETE_USER',
-      'user',
-      user.id,
-      { 
-        userName: user.name, 
-        userEmail: user.email, 
-        hadOrganization: !!user.organization,
-        organizationName: user.organization?.name,
-        reason 
-      },
-      req.ip
-    )
+    await logAdminAction(req.adminId, 'DELETE_USER', 'user', user.id,
+      { userName: user.name, userEmail: user.email, hadOrganization: !!user.organization,
+        organizationName: user.organization?.name, reason }, req.ip)
 
     await user.destroy()
 
@@ -528,11 +340,7 @@ export const deleteUser = async (req, res) => {
     })
   } catch (error) {
     console.error('Delete user error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to delete user',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to delete user', error: error.message })
   }
 }
 
@@ -543,11 +351,7 @@ export const getAdminLogs = async (req, res) => {
     const offset = (page - 1) * limit
 
     const { rows: logs, count } = await AdminLog.findAndCountAll({
-      include: [{
-        model: User,
-        as: 'admin',
-        attributes: ['id', 'name', 'email']
-      }],
+      include: [{ model: User, as: 'admin', attributes: ['id', 'name', 'email'] }],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
@@ -556,19 +360,10 @@ export const getAdminLogs = async (req, res) => {
     res.json({
       success: true,
       data: logs,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(count / limit)
-      }
+      pagination: { total: count, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(count / limit) }
     })
   } catch (error) {
     console.error('Get admin logs error:', error)
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to get admin logs',
-      error: error.message 
-    })
+    res.status(500).json({ success: false, message: 'Failed to get admin logs', error: error.message })
   }
 }
