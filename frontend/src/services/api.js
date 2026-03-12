@@ -11,47 +11,51 @@ const api = axios.create({
   }
 })
 
+// Login endpoints — never attach tokens to these
+const isLoginEndpoint = (url) =>
+  url === '/admin/login' || url === '/auth/login' || url === '/auth/register'
+
 // Request interceptor to add token
 api.interceptors.request.use(
   (config) => {
     console.log('Making request to:', config.url)
-    
-    // Check if this is an admin endpoint
+
+    // Never attach a token to login/register endpoints
+    if (isLoginEndpoint(config.url)) {
+      console.log('🔓 Login endpoint — no token attached')
+      return config
+    }
+
     const isAdminEndpoint = config.url?.includes('/admin')
-    
+
     let token
     if (isAdminEndpoint) {
       token = localStorage.getItem('adminToken')
-      console.log('🔐 Admin endpoint detected, using adminToken:', token ? 'present' : 'missing')
+      console.log('🔐 Admin endpoint, using adminToken:', token ? 'present' : 'missing')
     } else {
-      // Use sessionStorage for regular user token
       token = sessionStorage.getItem('token')
       console.log('👤 Regular endpoint, using token:', token ? 'present' : 'missing')
     }
-    
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    
+
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => {
-    return response.data
-  },
+  (response) => response.data,
   (error) => {
-    const isAdminEndpoint = error.config?.url?.includes('/admin')
-    // Auth endpoints returning 401 mean wrong credentials — not an expired session.
-    // Never redirect on these; let the component's onError handler show the message.
-    const isAuthEndpoint = error.config?.url?.includes('/auth/')
+    const url = error.config?.url
+    const isAdminEndpoint = url?.includes('/admin')
+    // Never auto-redirect on login/auth endpoints — let the component handle the error
+    const isAuthUrl = isLoginEndpoint(url) || url?.includes('/auth/')
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    if (error.response?.status === 401 && !isAuthUrl) {
       if (isAdminEndpoint) {
         console.error('❌ Admin session expired - clearing admin tokens')
         localStorage.removeItem('adminToken')
