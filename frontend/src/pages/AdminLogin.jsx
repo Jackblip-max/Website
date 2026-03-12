@@ -1,162 +1,359 @@
-import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
-import { Shield, Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react'
-import DynamicBackground from '../components/common/DynamicBackground'
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { adminAuthService } from '../services/adminAuthService'
 
 const AdminLogin = () => {
   const navigate = useNavigate()
+  const canvasRef = useRef(null)
+  const [formData, setFormData] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  // ⭐ FIXED: Use adminAuthService instead of regular login
-  const loginMutation = useMutation({
-    mutationFn: async (data) => {
-      console.log('🔐 Admin login attempt...')
-      const result = await adminAuthService.login(data.email, data.password)
-      return result
-    },
-    onSuccess: (response) => {
-      console.log('✅ Admin login successful:', response)
-      toast.success('Admin login successful!')
-      navigate('/admin')
-    },
-    onError: (error) => {
-      console.error('❌ Admin login error:', error)
-      const message = error.response?.data?.message || 'Invalid admin credentials'
-      toast.error(message)
+  // ── 3D Canvas Animation ──────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+
+    const resize = () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
     }
-  })
+    resize()
+    window.addEventListener('resize', resize)
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
+    // Depth dots (star-tunnel effect)
+    const dots = Array.from({ length: 130 }, () => ({
+      x: (Math.random() - 0.5) * 1800,
+      y: (Math.random() - 0.5) * 1800,
+      z: Math.random() * 1200,
+      r: Math.random() * 2 + 0.5,
+      speed: 0.4 + Math.random() * 0.6
+    }))
 
-  const handleSubmit = (e) => {
+    // Wireframe cubes
+    const cubes = Array.from({ length: 7 }, () => ({
+      x: (Math.random() - 0.5) * window.innerWidth,
+      y: (Math.random() - 0.5) * window.innerHeight,
+      size: 25 + Math.random() * 55,
+      rx: Math.random() * Math.PI * 2,
+      ry: Math.random() * Math.PI * 2,
+      drx: (Math.random() - 0.5) * 0.007,
+      dry: (Math.random() - 0.5) * 0.007,
+      alpha: 0.05 + Math.random() * 0.07
+    }))
+
+    function project(x, y, z, cx, cy, fov = 600) {
+      const scale = fov / (fov + z)
+      return { px: x * scale + cx, py: y * scale + cy, scale }
+    }
+
+    function drawCube(cube, cx, cy) {
+      const s = cube.size / 2
+      const verts = [
+        [-s,-s,-s],[s,-s,-s],[s,s,-s],[-s,s,-s],
+        [-s,-s, s],[s,-s, s],[s,s, s],[-s,s, s]
+      ]
+      const crx = Math.cos(cube.rx), srx = Math.sin(cube.rx)
+      const cry = Math.cos(cube.ry), sry = Math.sin(cube.ry)
+
+      const proj = verts.map(([vx, vy, vz]) => {
+        const tx = vx * cry - vz * sry
+        const tz = vx * sry + vz * cry
+        const ty2 = vy * crx - tz * srx
+        const tz2 = vy * srx + tz * crx
+        const fov = 400
+        const sc = fov / (fov + tz2 + 200)
+        return [tx * sc + cx + cube.x, ty2 * sc + cy + cube.y]
+      })
+
+      const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]
+      ctx.strokeStyle = `rgba(99,102,241,${cube.alpha})`
+      ctx.lineWidth = 0.8
+      ctx.beginPath()
+      edges.forEach(([a, b]) => {
+        ctx.moveTo(proj[a][0], proj[a][1])
+        ctx.lineTo(proj[b][0], proj[b][1])
+      })
+      ctx.stroke()
+    }
+
+    let animId
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      const cx = canvas.width / 2
+      const cy = canvas.height / 2
+
+      // Connection lines
+      ctx.strokeStyle = 'rgba(99,102,241,0.035)'
+      ctx.lineWidth = 0.5
+      for (let i = 0; i < dots.length; i++) {
+        const a = project(dots[i].x, dots[i].y, dots[i].z, cx, cy)
+        for (let j = i + 1; j < dots.length; j++) {
+          const b = project(dots[j].x, dots[j].y, dots[j].z, cx, cy)
+          if (Math.hypot(a.px - b.px, a.py - b.py) < 100) {
+            ctx.beginPath()
+            ctx.moveTo(a.px, a.py)
+            ctx.lineTo(b.px, b.py)
+            ctx.stroke()
+          }
+        }
+      }
+
+      // Dots
+      dots.forEach(d => {
+        d.z -= d.speed * 1.4
+        if (d.z < 0) d.z = 1200
+        const { px, py, scale } = project(d.x, d.y, d.z, cx, cy)
+        if (px < 0 || px > canvas.width || py < 0 || py > canvas.height) return
+        ctx.beginPath()
+        ctx.arc(px, py, d.r * scale, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(148,163,255,${0.5 * scale})`
+        ctx.fill()
+      })
+
+      // Cubes
+      cubes.forEach(cube => {
+        cube.rx += cube.drx
+        cube.ry += cube.dry
+        drawCube(cube, cx, cy)
+      })
+
+      animId = requestAnimationFrame(animate)
+    }
+    animate()
+
+    return () => {
+      window.removeEventListener('resize', resize)
+      cancelAnimationFrame(animId)
+    }
+  }, [])
+
+  // ── Login handler ────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    
     if (!formData.email || !formData.password) {
-      toast.error('Please fill in all fields')
+      setError('Please fill in all fields')
       return
     }
-
-    loginMutation.mutate(formData)
+    setLoading(true)
+    setError('')
+    try {
+      await adminAuthService.login(formData)
+      navigate('/admin')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid credentials')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <DynamicBackground category="minimal" overlay={0.9}>
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full">
-          {/* Back Button */}
-          <Link 
-            to="/"
-            className="inline-flex items-center text-white hover:text-blue-200 mb-8 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Home
-          </Link>
+    <div className="relative min-h-screen overflow-hidden flex items-center justify-center"
+      style={{ background: '#080d1a' }}>
 
-          {/* Admin Login Card */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 shadow-xl">
-                <Shield className="w-12 h-12" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Admin Login</h2>
-              <p className="text-gray-600">Access the admin dashboard</p>
-            </div>
+      {/* 3D canvas */}
+      <canvas ref={canvasRef} className="absolute inset-0 z-0" />
 
-            {/* Security Notice */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-amber-900">Authorized Access Only</p>
-                <p className="text-xs text-amber-700 mt-1">
-                  This area is restricted to system administrators. Unauthorized access attempts will be logged.
-                </p>
-              </div>
-            </div>
+      {/* Ambient glows */}
+      <div className="absolute top-0 left-0 w-96 h-96 rounded-full pointer-events-none z-0"
+        style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)', transform: 'translate(-30%, -30%)' }} />
+      <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full pointer-events-none z-0"
+        style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)', transform: 'translate(30%, 30%)' }} />
 
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Admin Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="admin@myanvolunteer.org"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-medium"
-                  required
-                  autoComplete="email"
-                />
-              </div>
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-md mx-4"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: '24px',
+          padding: '48px 40px',
+          backdropFilter: 'blur(24px)',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)'
+        }}>
 
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Enter admin password"
-                    className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-medium"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                    tabIndex="-1"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginMutation.isPending}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 rounded-xl hover:from-blue-700 hover:to-indigo-800 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-xl flex items-center justify-center gap-2"
-              >
-                {loginMutation.isPending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Authenticating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Shield className="w-5 h-5" />
-                    <span>Access Admin Panel</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Footer */}
-            <div className="mt-6 text-center">
-              <p className="text-xs text-gray-500">
-                Protected by MyanVolunteer Security • All access is monitored
-              </p>
-            </div>
+        {/* Shield icon */}
+        <div className="flex justify-center mb-6">
+          <div style={{
+            width: 72, height: 72,
+            background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+            borderRadius: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(99,102,241,0.45)',
+            animation: 'iconFloat 3s ease-in-out infinite'
+          }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
           </div>
         </div>
+
+        <h1 className="text-center text-3xl font-bold text-white mb-1 tracking-tight">
+          Admin Portal
+        </h1>
+        <p className="text-center text-xs font-semibold mb-6 tracking-widest uppercase"
+          style={{ color: 'rgba(255,255,255,0.35)' }}>
+          MyanVolunteer · Secure Access
+        </p>
+
+        {/* Secure badge */}
+        <div className="flex items-center justify-center gap-2 mb-8 px-4 py-2.5 rounded-xl"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%', background: '#4ade80',
+            animation: 'blink 2s infinite', flexShrink: 0
+          }} />
+          <span className="text-xs font-medium" style={{ color: '#4ade80' }}>
+            Secure connection established
+          </span>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-5 px-4 py-3 rounded-xl text-sm font-medium text-red-300"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-xs font-semibold mb-2 tracking-widest uppercase"
+              style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+              placeholder="admin@myanvolunteer.org"
+              autoComplete="email"
+              style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 12,
+                padding: '14px 16px',
+                color: '#fff',
+                fontSize: 15,
+                outline: 'none',
+                transition: 'all 0.2s'
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = 'rgba(99,102,241,0.7)'
+                e.target.style.background = 'rgba(255,255,255,0.09)'
+                e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)'
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = 'rgba(255,255,255,0.1)'
+                e.target.style.background = 'rgba(255,255,255,0.06)'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-2 tracking-widest uppercase"
+              style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
+                placeholder="••••••••••••"
+                autoComplete="current-password"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 12,
+                  padding: '14px 48px 14px 16px',
+                  color: '#fff',
+                  fontSize: 15,
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                onFocus={e => {
+                  e.target.style.borderColor = 'rgba(99,102,241,0.7)'
+                  e.target.style.background = 'rgba(255,255,255,0.09)'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)'
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = 'rgba(255,255,255,0.1)'
+                  e.target.style.background = 'rgba(255,255,255,0.06)'
+                  e.target.style.boxShadow = 'none'
+                }}
+              />
+              <button type="button" tabIndex={-1}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2"
+                style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              padding: '15px',
+              background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #3b82f6, #6366f1)',
+              border: 'none',
+              borderRadius: 12,
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              letterSpacing: '0.3px'
+            }}
+            onMouseEnter={e => { if (!loading) e.target.style.boxShadow = '0 8px 24px rgba(99,102,241,0.5)' }}
+            onMouseLeave={e => { e.target.style.boxShadow = 'none' }}
+          >
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <svg style={{ animation: 'spin 1s linear infinite' }} width="18" height="18" fill="none" viewBox="0 0 24 24">
+                  <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                  <path style={{ opacity: 0.75 }} fill="white" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Signing in...
+              </span>
+            ) : 'Sign In to Dashboard'}
+          </button>
+        </form>
+
+        <p className="text-center mt-8 text-xs leading-relaxed"
+          style={{ color: 'rgba(255,255,255,0.18)' }}>
+          Restricted to authorized administrators only.<br />
+          Unauthorized access attempts are logged.
+        </p>
       </div>
-    </DynamicBackground>
+
+      <style>{`
+        @keyframes iconFloat {
+          0%, 100% { transform: translateY(0); }
+          50%       { transform: translateY(-6px); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.3; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        input::placeholder { color: rgba(255,255,255,0.22); }
+      `}</style>
+    </div>
   )
 }
 
