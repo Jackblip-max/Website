@@ -47,7 +47,7 @@ const About = () => {
 
   const team = [
     { initials: 'KM', name: en ? 'Ko Min' : 'ကိုမင်း', role: en ? 'Founder & CEO' : 'တည်ထောင်သူ & CEO', color: '#059669' },
-    { initials: 'MA', name: en ? 'Ma Aye' : 'မေအေး', role: en ? 'Head of Operations' : 'စစ်ဆင်ရေးမှူး', color: '#0891b2' },
+    { initials: 'MA', name: en ? 'Ma Aye' : 'မအေး', role: en ? 'Head of Operations' : 'operationချုပ်', color: '#0891b2' },
     { initials: 'TH', name: en ? 'Thura' : 'သူရ', role: en ? 'Tech Lead' : 'နည်းပညာမှူး', color: '#7c3aed' },
   ]
 
@@ -72,12 +72,11 @@ const About = () => {
           </div>
           <h1 className="text-5xl md:text-6xl font-bold mb-6 text-gray-900" style={{ letterSpacing: '-1.5px', lineHeight: 1.1 }}>
             {en ? 'About ' : ''}<span style={{ color: '#059669' }}>MyanVolunteer</span>
-            {!en && ' အကြောင်း'}
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
             {en
               ? 'We\'re building Myanmar\'s most trusted volunteer platform — connecting passionate people with organizations doing meaningful work across the country.'
-              : 'ကျွန်ုပ်တို့သည် မြန်မာနိုင်ငံ၏ အယုံကြည်ဆုံးသောစေတနာ့ဝန်ထမ်းပလက်ဖောင်းကို တည်ဆောက်နေပါသည်။'}
+              : 'ကျွန်ုပ်တို့သည် မြန်မာနိုင်ငံ၏ အယုံကြည်ဆုံးသောစေတနာ့ဝန်ထမ်း platfom ကို တည်ဆောက်နေပါသည်။'}
           </p>
         </div>
 
@@ -104,7 +103,7 @@ const About = () => {
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 leading-tight" style={{ letterSpacing: '-0.5px' }}>
                 {en
                   ? 'Connecting hearts, transforming communities'
-                  : 'နှလုံးများချိတ်ဆက်ကာ အသိုက်အဝန်းများပြောင်းလဲ'}
+                  : 'နှလုံးသားများချိတ်ဆက်ကာ ပတ်၀န်းကျင်များပြောင်းလဲ'}
               </h2>
               <p className="text-emerald-100 text-lg leading-relaxed max-w-2xl">
                 {en
@@ -130,7 +129,7 @@ const About = () => {
         <div className="max-w-5xl mx-auto px-4 mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-3" style={{ letterSpacing: '-0.5px' }}>
-              {en ? 'What We Stand For' : 'ကျွန်ုပ်တို့ကိုယ်စားပြုသည့်အရာ'}
+              {en ? 'What We Stand For' : 'ကျွန်ုပ်တို့ကိုယ်စားပြူသည့်အရာ'}
             </h2>
             <p className="text-gray-500">{en ? 'The principles that guide everything we build' : 'ကျွန်ုပ်တို့တည်ဆောက်သမျှကို လမ်းညွှန်သောမူများ'}</p>
           </div>
