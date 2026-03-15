@@ -5,6 +5,15 @@ import { Op } from 'sequelize'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+// ── Helper: safe log — never crashes the calling action ──────────────
+const safeLog = async (adminId, action, targetType, targetId, details, ip) => {
+  try {
+    await logAdminAction(adminId, action, targetType, targetId, details, ip)
+  } catch (logError) {
+    console.error(`⚠️ Admin log failed (action still completed): ${action}`, logError.message)
+  }
+}
+
 export const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body
@@ -66,7 +75,6 @@ export const getDashboardStats = async (req, res) => {
       totalOpportunities,
       totalApplications
     ] = await Promise.all([
-      // ✅ Exclude admin accounts from user count
       User.count({ where: { role: { [Op.ne]: 'admin' } } }),
       Organization.count(),
       Organization.count({ where: { verificationStatus: 'pending' } }),
@@ -75,7 +83,6 @@ export const getDashboardStats = async (req, res) => {
       Application.count()
     ])
 
-    // ✅ Return flat object — frontend reads response.totalUsers directly
     res.json({
       success: true,
       totalUsers,
@@ -104,7 +111,6 @@ export const getPendingOrganizations = async (req, res) => {
       order: [['createdAt', 'ASC']]
     })
 
-    // ✅ Return flat array — frontend does Array.isArray(response)
     res.json(organizations)
   } catch (error) {
     console.error('Get pending organizations error:', error)
@@ -161,7 +167,8 @@ export const approveOrganization = async (req, res) => {
       verificationReason: message || 'Organization verified and approved'
     })
 
-    await logAdminAction(req.adminId, 'APPROVE_ORGANIZATION', 'organization', organization.id,
+    // ✅ Safe — logging failure will never crash the approval
+    await safeLog(req.adminId, 'APPROVE_ORGANIZATION', 'organization', organization.id,
       { organizationName: organization.name, message }, req.ip)
 
     try {
@@ -203,7 +210,8 @@ export const rejectOrganization = async (req, res) => {
       verificationReason: reason
     })
 
-    await logAdminAction(req.adminId, 'REJECT_ORGANIZATION', 'organization', organization.id,
+    // ✅ Safe — logging failure will never crash the rejection
+    await safeLog(req.adminId, 'REJECT_ORGANIZATION', 'organization', organization.id,
       { organizationName: organization.name, reason }, req.ip)
 
     try {
@@ -241,7 +249,8 @@ export const deleteOrganization = async (req, res) => {
     const userName = organization.user?.name
     const userEmail = organization.user?.email
 
-    await logAdminAction(req.adminId, 'DELETE_ORGANIZATION', 'organization', organization.id,
+    // ✅ Log BEFORE destroy so we still have the org id
+    await safeLog(req.adminId, 'DELETE_ORGANIZATION', 'organization', organization.id,
       { organizationName: orgName, userName, userId: organization.userId, reason }, req.ip)
 
     await organization.destroy()
@@ -287,7 +296,6 @@ export const getAllUsers = async (req, res) => {
       order: [['createdAt', 'DESC']]
     })
 
-    // ✅ Return flat array — frontend does Array.isArray(response)
     res.json(users)
   } catch (error) {
     console.error('Get all users error:', error)
@@ -318,6 +326,11 @@ export const deleteUser = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Cannot delete admin users' })
     }
 
+    // ✅ Log BEFORE destroy so we still have the user id
+    await safeLog(req.adminId, 'DELETE_USER', 'user', user.id,
+      { userName: user.name, userEmail: user.email, hadOrganization: !!user.organization,
+        organizationName: user.organization?.name, reason }, req.ip)
+
     if (user.organization) {
       try {
         await sendOrganizationDeletionEmail(user.email, user.name, user.organization.name,
@@ -327,10 +340,6 @@ export const deleteUser = async (req, res) => {
       }
       await user.organization.destroy()
     }
-
-    await logAdminAction(req.adminId, 'DELETE_USER', 'user', user.id,
-      { userName: user.name, userEmail: user.email, hadOrganization: !!user.organization,
-        organizationName: user.organization?.name, reason }, req.ip)
 
     await user.destroy()
 
