@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Calendar, Clock, Bookmark, Share2, AlertCircle, X, Tag, Users, Building2 } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
@@ -12,6 +13,7 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
   if (!isOpen) return null
 
   const getModeColor = (mode) => {
+
     switch (mode) {
       case 'onsite': return { bg: '#dbeafe', color: '#1d4ed8', label: 'On-site' }
       case 'remote': return { bg: '#ede9fe', color: '#7c3aed', label: 'Remote' }
@@ -21,12 +23,12 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
   }
   const mode = getModeColor(opportunity.mode)
 
-  return (
+  return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
+      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
 
         {/* Header */}
         <div style={{ padding: '24px 24px 0', position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: '1px solid #f3f4f6', paddingBottom: 16 }}>
@@ -57,7 +59,7 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
         </div>
 
         {/* Body */}
-        <div style={{ padding: 24 }}>
+        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
 
           {/* Meta info */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
@@ -109,42 +111,43 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
 
           {/* Not authenticated warning */}
           {!isAuthenticated && (
-            <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ marginBottom: 8, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <AlertCircle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 13, color: '#92400e', margin: 0 }}>
                 <strong>Registration required</strong> — Create a free account to apply for volunteer opportunities.
               </p>
             </div>
           )}
+        </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => { onApply(); }}
-              disabled={isApplying}
-              style={{
-                flex: 1, padding: '13px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 15, cursor: isApplying ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
-                background: isAuthenticated ? 'linear-gradient(135deg, #059669, #0d9488)' : '#f59e0b',
-                color: '#fff', opacity: isApplying ? 0.7 : 1,
-                boxShadow: isAuthenticated ? '0 4px 16px rgba(5,150,105,0.3)' : 'none'
-              }}>
-              {isApplying ? 'Applying...' : isAuthenticated ? t('apply') : 'Register to Apply'}
-            </button>
-            <button
-              onClick={onSave}
-              disabled={isSaving || !isAuthenticated}
-              style={{
-                padding: '13px 16px', borderRadius: 12, border: `2px solid ${isSaved ? '#059669' : '#e5e7eb'}`,
-                background: isSaved ? '#d1fae5' : '#fff', color: isSaved ? '#059669' : '#6b7280',
-                cursor: (!isAuthenticated || isSaving) ? 'not-allowed' : 'pointer', transition: 'all 0.2s'
-              }}
-              title={!isAuthenticated ? 'Login to save' : isSaved ? 'Unsave' : 'Save for later'}>
-              <Bookmark style={{ width: 20, height: 20 }} fill={isSaved ? 'currentColor' : 'none'} />
-            </button>
-          </div>
+        {/* ── Sticky action footer ── */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #f3f4f6', background: '#fff', borderRadius: '0 0 20px 20px', display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => { onApply(); }}
+            disabled={isApplying}
+            style={{
+              flex: 1, padding: '13px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: 15, cursor: isApplying ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+              background: isAuthenticated ? 'linear-gradient(135deg, #059669, #0d9488)' : '#f59e0b',
+              color: '#fff', opacity: isApplying ? 0.7 : 1,
+              boxShadow: isAuthenticated ? '0 4px 16px rgba(5,150,105,0.3)' : 'none'
+            }}>
+            {isApplying ? 'Applying...' : isAuthenticated ? t('apply') : 'Register to Apply'}
+          </button>
+          <button
+            onClick={onSave}
+            disabled={isSaving || !isAuthenticated}
+            style={{
+              padding: '13px 16px', borderRadius: 12, border: `2px solid ${isSaved ? '#059669' : '#e5e7eb'}`,
+              background: isSaved ? '#d1fae5' : '#fff', color: isSaved ? '#059669' : '#6b7280',
+              cursor: (!isAuthenticated || isSaving) ? 'not-allowed' : 'pointer', transition: 'all 0.2s'
+            }}
+            title={!isAuthenticated ? 'Login to save' : isSaved ? 'Unsave' : 'Save for later'}>
+            <Bookmark style={{ width: 20, height: 20 }} fill={isSaved ? 'currentColor' : 'none'} />
+          </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
