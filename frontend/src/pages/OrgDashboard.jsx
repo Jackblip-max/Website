@@ -138,7 +138,6 @@ const OrgDashboard = () => {
       category: opp.category || '',
       deadline: opp.deadline ? opp.deadline.split('T')[0] : '',
       requirements: opp.requirements || '',
-      slots: opp.slots || ''
     })
   }
 
@@ -162,14 +161,16 @@ const OrgDashboard = () => {
 
   const statusBadge = (status) => {
     const map = {
-      active:   { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Active' },
-      expired:  { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Expired' },
-      closed:   { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Closed' },
-      draft:    { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Draft' },
+      active: { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Active' },
+      closed: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Closed' },
+      draft:  { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Draft'  },
     }
     const s = map[status] || map.active
     return <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>{s.label}</span>
   }
+
+  // Filter out expired — backend auto-handles these
+  const activeOppsData = oppsData.filter(opp => opp.status !== 'expired')
 
   if (authLoading || statsLoading || oppsLoading || orgLoading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader /></div>
@@ -263,7 +264,7 @@ const OrgDashboard = () => {
             <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-gray-100">
               <div className="flex gap-1">
                 {[
-                  { id: 'opportunities', label: `Opportunities (${oppsData.length})` },
+                  { id: 'opportunities', label: `Opportunities (${activeOppsData.length})` },
                   { id: 'applicants',    label: `Applicants (${applicants?.length || 0})` },
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -291,7 +292,7 @@ const OrgDashboard = () => {
                 <div className="space-y-4">
                   {oppsLoading ? (
                     <div className="flex justify-center py-12"><Loader /></div>
-                  ) : oppsData.length === 0 ? (
+                  ) : activeOppsData.length === 0 ? (
                     <div className="text-center py-16">
                       <Building2 className="w-14 h-14 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-500 font-medium">No opportunities posted yet</p>
@@ -301,7 +302,7 @@ const OrgDashboard = () => {
                         </Link>
                       )}
                     </div>
-                  ) : oppsData.map(opp => (
+                  ) : activeOppsData.map(opp => (
                     <div key={opp.id} className="border border-gray-200 rounded-xl overflow-hidden">
 
                       {/* ── View mode ── */}
@@ -440,11 +441,7 @@ const OrgDashboard = () => {
                               <input type="date" value={editForm.deadline} onChange={e => setEditForm(p => ({ ...p, deadline: e.target.value }))}
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                             </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">Slots available</label>
-                              <input type="number" min="1" value={editForm.slots} onChange={e => setEditForm(p => ({ ...p, slots: e.target.value }))}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                            </div>
+
                             <div className="md:col-span-2">
                               <label className="block text-xs font-semibold text-gray-600 mb-1">Requirements</label>
                               <textarea value={editForm.requirements} onChange={e => setEditForm(p => ({ ...p, requirements: e.target.value }))}
@@ -538,7 +535,7 @@ const OrgDashboard = () => {
                       <Users className="w-14 h-14 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-500 font-medium">No applicants yet</p>
                       <p className="text-gray-400 text-sm mt-1">
-                        {oppsData.length > 0 ? 'Applications will appear here when volunteers apply.' : 'Post opportunities to start receiving applications.'}
+                        {activeOppsData.length > 0 ? 'Applications will appear here when volunteers apply.' : 'Post opportunities to start receiving applications.'}
                       </p>
                     </div>
                   )}
