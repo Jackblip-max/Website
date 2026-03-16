@@ -15,7 +15,6 @@ export const sendDeadlineReminders = async () => {
     console.log('🔔 Checking for deadline reminders...')
     console.log('Looking for deadlines on:', tomorrow.toDateString())
 
-    // Find opportunities with deadline tomorrow
     const opportunities = await Opportunity.findAll({
       where: {
         deadline: {
@@ -34,7 +33,6 @@ export const sendDeadlineReminders = async () => {
     console.log(`Found ${opportunities.length} opportunities with deadline tomorrow`)
 
     for (const opportunity of opportunities) {
-      // Find all volunteers who saved this opportunity but haven't applied
       const savedBy = await SavedOpportunity.findAll({
         where: { opportunityId: opportunity.id },
         include: [{
@@ -43,9 +41,7 @@ export const sendDeadlineReminders = async () => {
           include: [{
             model: User,
             as: 'user',
-            where: {
-              isVerified: true // Only send to verified users
-            },
+            where: { isVerified: true },
             attributes: ['id', 'name', 'email']
           }]
         }]
@@ -53,12 +49,10 @@ export const sendDeadlineReminders = async () => {
 
       console.log(`Sending reminders to ${savedBy.length} volunteers for: ${opportunity.title}`)
 
-      // Send reminder to each volunteer
       for (const saved of savedBy) {
         const volunteer = saved.volunteer
         const user = volunteer.user
 
-        // Check if volunteer has notifications enabled
         if (!volunteer.notificationsEnabled) {
           console.log(`Skipping ${user.email} - notifications disabled`)
           continue
@@ -73,13 +67,11 @@ export const sendDeadlineReminders = async () => {
             mode: opportunity.mode,
             deadline: opportunity.deadline
           })
-
           console.log(`✅ Reminder sent to ${user.email}`)
         } catch (error) {
           console.error(`❌ Failed to send reminder to ${user.email}:`, error.message)
         }
 
-        // Add small delay to avoid overwhelming email server
         await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
@@ -90,41 +82,31 @@ export const sendDeadlineReminders = async () => {
   }
 }
 
-// Check for expired opportunities and mark them as expired
+// Check for expired opportunities and DELETE them from the database
 export const checkExpiredDeadlines = async () => {
   try {
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setHours(23, 59, 59, 999)
 
     console.log('🕐 Checking for expired deadlines...')
 
-    // Find opportunities that expired
+    // Find all opportunities past their deadline
     const expiredOpportunities = await Opportunity.findAll({
       where: {
-        deadline: {
-          [Op.lt]: today
-        },
-        status: 'active'
+        deadline: { [Op.lt]: today },
+        status: { [Op.in]: ['active', 'expired'] } // catch both in case any were previously marked
       },
-      include: [{
-        model: Organization,
-        as: 'organization',
-        include: [{
-          model: User,
-          as: 'user'
-        }]
-      }]
+      attributes: ['id', 'title', 'deadline', 'status']
     })
 
-    console.log(`Found ${expiredOpportunities.length} expired opportunities`)
+    console.log(`Found ${expiredOpportunities.length} expired opportunities to delete`)
 
     for (const opportunity of expiredOpportunities) {
-      // Update status to expired
-      await opportunity.update({ status: 'expired' })
-      console.log(`✅ Marked as expired: ${opportunity.title}`)
+      await opportunity.destroy()
+      console.log(`🗑️ Deleted expired opportunity: ${opportunity.title} (id: ${opportunity.id})`)
     }
 
-    console.log('🕐 Expired deadline check completed')
+    console.log(`🕐 Expired deadline check completed — ${expiredOpportunities.length} opportunities deleted`)
   } catch (error) {
     console.error('Error checking expired deadlines:', error)
   }
