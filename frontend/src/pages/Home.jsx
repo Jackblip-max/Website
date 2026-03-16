@@ -8,7 +8,6 @@ import { volunteerService } from '../services/volunteerService'
 import OpportunityCard from '../components/volunteer/OpportunityCard'
 import Loader from '../components/common/Loader'
 import DynamicBackground from '../components/common/DynamicBackground'
-import { Link, useNavigate } from 'react-router-dom'
 
 const Home = () => {
   const { t } = useLanguage()
@@ -242,7 +241,7 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOpportunities.length > 0 ? (
               filteredOpportunities.map((opportunity) => (
-                <div key={opportunity.id} className="transform hover:scale-105 transition-all">
+                <div key={opportunity.id}>
                   <OpportunityCard opportunity={opportunity} />
                 </div>
               ))
