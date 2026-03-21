@@ -40,15 +40,15 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link to="/" onClick={closeAll} className="flex items-center space-x-2 flex-shrink-0">
+          <Link to="/" onClick={closeAll} className="flex items-center space-x-2 min-w-0 flex-shrink">
             <img
               src="/logo.png"
               alt="MyanVolunteer"
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-contain"
+              className="w-9 h-9 rounded-full object-contain bg-white flex-shrink-0"
             />
-            <div className="hidden sm:block">
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">MyanVolunteer</h1>
-              <p className="text-xs text-gray-500 hidden lg:block truncate max-w-[180px]">{t('tagline')}</p>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-bold text-gray-900 leading-tight truncate">MyanVolunteer</h1>
+              <p className="text-xs text-gray-400 truncate">{t('tagline')}</p>
             </div>
           </Link>
 
