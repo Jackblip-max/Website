@@ -12,9 +12,11 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-2 sm:col-span-2 md:col-span-1">
             <div className="flex items-center space-x-2 mb-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center font-bold text-sm">
-                MV
-              </div>
+              <img
+                src="/logo.png"
+                alt="MyanVolunteer"
+                className="w-9 h-9 rounded-full object-contain"
+              />
               <span className="text-lg font-bold">MyanVolunteer</span>
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">{t('tagline')}</p>
