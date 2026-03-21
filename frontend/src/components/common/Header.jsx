@@ -41,9 +41,11 @@ const Header = () => {
 
           {/* Logo */}
           <Link to="/" onClick={closeAll} className="flex items-center space-x-2 flex-shrink-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-base sm:text-lg">
-              MV
-            </div>
+            <img
+              src="/logo.png"
+              alt="MyanVolunteer"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-contain"
+            />
             <div className="hidden sm:block">
               <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">MyanVolunteer</h1>
               <p className="text-xs text-gray-500 hidden lg:block truncate max-w-[180px]">{t('tagline')}</p>
