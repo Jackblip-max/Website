@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, Calendar, Clock, Bookmark, Share2, AlertCircle, X, Users } from 'lucide-react'
+import { MapPin, Calendar, Clock, Bookmark, Share2, AlertCircle, X, Users, Check } from 'lucide-react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useLanguage } from '../../context/LanguageContext'
 import { useAuth } from '../../context/AuthContext'
 import { volunteerService } from '../../services/volunteerService'
 
-const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSaved, isApplying, isSaving, isAuthenticated, navigate, t }) => {
+const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, onShare, isSaved, isApplying, isSaving, isAuthenticated, navigate, t }) => {
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden'
     else document.body.style.overflow = ''
@@ -108,7 +108,7 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
 
         {/* Footer */}
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-t border-gray-100 bg-white flex gap-2.5">
-          <button onClick={() => { onApply() }} disabled={isApplying}
+          <button onClick={onApply} disabled={isApplying}
             className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all border-none ${
               isAuthenticated
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-60'
@@ -124,6 +124,10 @@ const OpportunityModal = ({ opportunity, isOpen, onClose, onApply, onSave, isSav
             }`}>
             <Bookmark className="w-4 h-4 sm:w-5 sm:h-5" fill={isSaved ? 'currentColor' : 'none'} />
           </button>
+          <button onClick={onShare}
+            className="px-3.5 py-2.5 rounded-xl border-2 border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-all">
+            <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
         </div>
       </div>
     </div>,
@@ -137,6 +141,7 @@ const OpportunityCard = ({ opportunity }) => {
   const { isAuthenticated } = useAuth()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
 
   const { data: savedStatus, refetch: refetchSavedStatus } = useQuery({
     queryKey: ['savedStatus', opportunity.id],
@@ -217,9 +222,9 @@ const OpportunityCard = ({ opportunity }) => {
           </div>
           <div className="flex gap-2">
             <button onClick={() => { toast.dismiss(ti.id); navigate('/register') }}
-              className="flex-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 font-medium text-xs sm:text-sm">Register</button>
+              className="flex-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium text-xs">Register</button>
             <button onClick={() => { toast.dismiss(ti.id); navigate('/login') }}
-              className="flex-1 bg-gray-600 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 font-medium text-xs sm:text-sm">Login</button>
+              className="flex-1 bg-gray-600 text-white px-3 py-1.5 rounded-lg font-medium text-xs">Login</button>
           </div>
         </div>
       ), { duration: 6000 })
@@ -228,10 +233,55 @@ const OpportunityCard = ({ opportunity }) => {
     applyMutation.mutate(opportunity.id)
   }
 
-  const handleShare = (e) => {
-    e.stopPropagation()
-    navigator.clipboard.writeText(`${window.location.origin}/opportunities/${opportunity.id}`)
-    toast.success('Link copied!')
+  // ── Working Share Function ──────────────────────────────────────
+  const handleShare = async (e) => {
+    e?.stopPropagation()
+
+    const shareUrl = `${window.location.origin}/opportunities/${opportunity.id}`
+    const shareData = {
+      title: opportunity.title,
+      text: `Check out this volunteer opportunity: ${opportunity.title} by ${opportunity.organizationName}`,
+      url: shareUrl,
+    }
+
+    // Use native share sheet on mobile if available
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+        toast.success('Shared successfully!')
+      } catch (err) {
+        // User cancelled — no error needed
+        if (err.name !== 'AbortError') {
+          toast.error('Could not share')
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard on desktop
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareCopied(true)
+        toast.success('Link copied to clipboard!')
+        setTimeout(() => setShareCopied(false), 2000)
+      } catch {
+        // Final fallback for old browsers
+        const textArea = document.createElement('textarea')
+        textArea.value = shareUrl
+        textArea.style.position = 'fixed'
+        textArea.style.opacity = '0'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        try {
+          document.execCommand('copy')
+          setShareCopied(true)
+          toast.success('Link copied to clipboard!')
+          setTimeout(() => setShareCopied(false), 2000)
+        } catch {
+          toast.error('Could not copy link')
+        }
+        document.body.removeChild(textArea)
+      }
+    }
   }
 
   const getModeColor = (mode) => {
@@ -297,17 +347,28 @@ const OpportunityCard = ({ opportunity }) => {
               }`}>
               {applyMutation.isPending ? '...' : isAuthenticated ? t('apply') : 'Register'}
             </button>
+
             <button onClick={handleSave} disabled={isLoading || !isAuthenticated}
               className={`p-2 sm:p-2.5 rounded-lg border-2 transition-colors ${
                 !isAuthenticated ? 'border-gray-200 text-gray-300 cursor-not-allowed'
                   : isSaved ? 'bg-emerald-100 border-emerald-600 text-emerald-600'
                   : 'border-gray-300 text-gray-500 hover:border-emerald-600'
-              }`}>
+              }`}
+              title={!isAuthenticated ? 'Login to save' : isSaved ? 'Unsave' : 'Save'}>
               <Bookmark className="w-4 h-4" fill={isSaved ? 'currentColor' : 'none'} />
             </button>
+
             <button onClick={handleShare}
-              className="p-2 sm:p-2.5 rounded-lg border-2 border-gray-300 text-gray-500 hover:border-emerald-600 transition-colors">
-              <Share2 className="w-4 h-4" />
+              className={`p-2 sm:p-2.5 rounded-lg border-2 transition-colors ${
+                shareCopied
+                  ? 'bg-blue-100 border-blue-500 text-blue-600'
+                  : 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500'
+              }`}
+              title="Share this opportunity">
+              {shareCopied
+                ? <Check className="w-4 h-4" />
+                : <Share2 className="w-4 h-4" />
+              }
             </button>
           </div>
         </div>
@@ -319,6 +380,7 @@ const OpportunityCard = ({ opportunity }) => {
         opportunity={opportunity}
         onApply={handleApply}
         onSave={handleSave}
+        onShare={handleShare}
         isSaved={isSaved}
         isApplying={applyMutation.isPending}
         isSaving={isLoading}
