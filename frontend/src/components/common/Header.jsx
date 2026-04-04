@@ -44,7 +44,7 @@ const Header = () => {
             <img
               src="/logo.png"
               alt="MyanVolunteer"
-              className="w-9 h-9 rounded-full object-contain bg-white flex-shrink-0"
+              className="w-16 h-16 rounded-full object-contain bg-white flex-shrink-0"
             />
             <div className="min-w-0">
               <h1 className="text-sm sm:text-lg font-bold text-gray-900 leading-tight truncate">MyanVolunteer</h1>
