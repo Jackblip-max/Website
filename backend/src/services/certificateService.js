@@ -12,6 +12,17 @@ const __dirname = path.dirname(__filename)
 const resolveLogoPath = (logoValue) => {
   if (!logoValue) return null
 
+  // ✅ FIX: Handle full URLs (http://... or https://...)
+  if (logoValue.startsWith('http://') || logoValue.startsWith('https://')) {
+    try {
+      const url = new URL(logoValue)
+      logoValue = url.pathname // e.g. "/uploads/logos/logo-123.jpg"
+    } catch {
+      console.warn('⚠️  Could not parse logo URL:', logoValue)
+      return null
+    }
+  }
+
   // Already an absolute path
   if (path.isAbsolute(logoValue) && fs.existsSync(logoValue)) return logoValue
 
@@ -33,13 +44,6 @@ const resolveLogoPath = (logoValue) => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const hex2rgb = (hex, alpha = 1) => {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
 const roundRect = (ctx, x, y, w, h, r) => {
   ctx.beginPath()
   ctx.moveTo(x + r, y)
@@ -59,7 +63,7 @@ const roundRect = (ctx, x, y, w, h, r) => {
 export class CertificateService {
   constructor() {
     this.W = 2000
-    this.H = 1414   // A4 landscape ratio ×2 for hi-res
+    this.H = 1414 // A4 landscape ratio ×2 for hi-res
     this.certificatesDir = path.join(__dirname, '../../uploads/certificates')
     if (!fs.existsSync(this.certificatesDir)) {
       fs.mkdirSync(this.certificatesDir, { recursive: true })
@@ -78,10 +82,11 @@ export class CertificateService {
       location,
       certificateNumber,
       verificationCode,
-      signatoryName,
-      signatoryTitle,
-      signatureUrl,
     } = data
+
+    // ✅ DEBUG: Log what logo value is received (remove after fixing)
+    console.log('🔍 organizationLogo received:', organizationLogo)
+    console.log('🔍 resolved to:', resolveLogoPath(organizationLogo))
 
     const W = this.W
     const H = this.H
@@ -90,13 +95,13 @@ export class CertificateService {
 
     // ── 1. Background ─────────────────────────────────────────────────────────
     const bg = ctx.createLinearGradient(0, 0, W, H)
-    bg.addColorStop(0.00, '#0f1c2e')
-    bg.addColorStop(0.40, '#0d2340')
-    bg.addColorStop(1.00, '#081626')
+    bg.addColorStop(0.0, '#0f1c2e')
+    bg.addColorStop(0.4, '#0d2340')
+    bg.addColorStop(1.0, '#081626')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, W, H)
 
-    // Subtle noise overlay (drawn as a grid of tiny semi-transparent rects)
+    // Subtle noise overlay
     ctx.fillStyle = 'rgba(255,255,255,0.012)'
     for (let i = 0; i < 6000; i++) {
       ctx.fillRect(
@@ -117,7 +122,7 @@ export class CertificateService {
     roundRect(ctx, margin, margin, W - margin * 2, H - margin * 2, 12)
     ctx.stroke()
 
-    // Inner border (thinner, lighter gold)
+    // Inner border
     const m2 = margin + 16
     ctx.strokeStyle = 'rgba(212,175,55,0.35)'
     ctx.lineWidth = 1
@@ -126,10 +131,10 @@ export class CertificateService {
 
     // ── 4. Left accent bar ────────────────────────────────────────────────────
     const barGrad = ctx.createLinearGradient(0, 0, 0, H)
-    barGrad.addColorStop(0.00, 'transparent')
-    barGrad.addColorStop(0.30, '#d4af37')
-    barGrad.addColorStop(0.70, '#d4af37')
-    barGrad.addColorStop(1.00, 'transparent')
+    barGrad.addColorStop(0.0, 'transparent')
+    barGrad.addColorStop(0.3, '#d4af37')
+    barGrad.addColorStop(0.7, '#d4af37')
+    barGrad.addColorStop(1.0, 'transparent')
     ctx.fillStyle = barGrad
     ctx.fillRect(margin + 24, margin + 24, 6, H - (margin + 24) * 2)
 
@@ -137,6 +142,8 @@ export class CertificateService {
     const logoSize = 130
     const logoX = W / 2 - logoSize / 2
     const logoY = 112
+    const logoCX = W / 2
+    const logoCY = logoY + logoSize / 2
 
     const resolvedLogo = resolveLogoPath(organizationLogo)
 
@@ -146,7 +153,7 @@ export class CertificateService {
         // Circular clip
         ctx.save()
         ctx.beginPath()
-        ctx.arc(W / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
+        ctx.arc(logoCX, logoCY, logoSize / 2, 0, Math.PI * 2)
         ctx.clip()
         ctx.drawImage(img, logoX, logoY, logoSize, logoSize)
         ctx.restore()
@@ -154,17 +161,19 @@ export class CertificateService {
         ctx.strokeStyle = '#d4af37'
         ctx.lineWidth = 4
         ctx.beginPath()
-        ctx.arc(W / 2, logoY + logoSize / 2, logoSize / 2 + 6, 0, Math.PI * 2)
+        ctx.arc(logoCX, logoCY, logoSize / 2 + 6, 0, Math.PI * 2)
         ctx.stroke()
+        console.log('✅ Org logo rendered successfully')
       } catch (err) {
         console.warn('⚠️  loadImage failed, using placeholder:', err.message)
-        this.drawLogoPlaceholder(ctx, organizationName, W / 2, logoY + logoSize / 2, logoSize / 2)
+        this.drawLogoPlaceholder(ctx, organizationName, logoCX, logoCY, logoSize / 2)
       }
     } else {
-      this.drawLogoPlaceholder(ctx, organizationName, W / 2, logoY + logoSize / 2, logoSize / 2)
+      console.warn('⚠️  No resolved logo path — rendering placeholder for:', organizationName)
+      this.drawLogoPlaceholder(ctx, organizationName, logoCX, logoCY, logoSize / 2)
     }
 
-    // ── 6. Header ─────────────────────────────────────────────────────────────
+    // ── 6. Header text ────────────────────────────────────────────────────────
     let curY = logoY + logoSize + 52
 
     ctx.textAlign = 'center'
@@ -221,13 +230,20 @@ export class CertificateService {
 
     // ── 10. Details row ───────────────────────────────────────────────────────
     curY += 56
-    curY = this.drawDetailsRow(ctx, {
-      completionDate: new Date(completionDate).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      }),
-      hoursContributed,
-      location: location || 'Remote',
-    }, W, curY)
+    curY = this.drawDetailsRow(
+      ctx,
+      {
+        completionDate: new Date(completionDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        hoursContributed,
+        location: location || 'Remote',
+      },
+      W,
+      curY
+    )
 
     // ── 11. Footer (QR + cert number) ─────────────────────────────────────────
     await this.drawFooter(ctx, {
@@ -267,7 +283,7 @@ export class CertificateService {
 
     const initials = (orgName || 'ORG')
       .split(' ')
-      .map(w => w[0] || '')
+      .map((w) => w[0] || '')
       .join('')
       .substring(0, 2)
       .toUpperCase()
@@ -287,18 +303,15 @@ export class CertificateService {
     const boxX = W / 2 - boxW / 2
     const boxY = startY
 
-    // Dark inset background
     ctx.fillStyle = 'rgba(0,0,0,0.30)'
     roundRect(ctx, boxX, boxY, boxW, boxH, 8)
     ctx.fill()
 
-    // Gold border
     ctx.strokeStyle = '#d4af37'
     ctx.lineWidth = 3
     roundRect(ctx, boxX, boxY, boxW, boxH, 8)
     ctx.stroke()
 
-    // Inner thin border
     ctx.strokeStyle = 'rgba(212,175,55,0.4)'
     ctx.lineWidth = 1
     roundRect(ctx, boxX + 8, boxY + 8, boxW - 16, boxH - 16, 4)
@@ -308,7 +321,7 @@ export class CertificateService {
     ctx.fillStyle = '#d4af37'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(name.toUpperCase(), W / 2, boxY + boxH / 2)
+    ctx.fillText((name || '').toUpperCase(), W / 2, boxY + boxH / 2)
     ctx.textBaseline = 'alphabetic'
 
     return boxY + boxH
@@ -328,7 +341,6 @@ export class CertificateService {
     roundRect(ctx, rowX, startY, rowW, rowH, 8)
     ctx.stroke()
 
-    // Three columns
     const cols = [
       { label: 'COMPLETION DATE', value: details.completionDate },
       { label: 'HOURS CONTRIBUTED', value: `${details.hoursContributed} hours` },
@@ -339,7 +351,6 @@ export class CertificateService {
     cols.forEach((col, i) => {
       const cx = rowX + colW * i + colW / 2
 
-      // Divider (not after last)
       if (i > 0) {
         ctx.strokeStyle = 'rgba(212,175,55,0.2)'
         ctx.lineWidth = 1
@@ -368,7 +379,7 @@ export class CertificateService {
   async drawFooter(ctx, { certificateNumber, verificationCode, W, H, bottomMargin }) {
     const footerY = H - bottomMargin - 160
 
-    // Separator
+    // Separator line
     const sepGrad = ctx.createLinearGradient(200, 0, W - 200, 0)
     sepGrad.addColorStop(0, 'transparent')
     sepGrad.addColorStop(0.15, 'rgba(212,175,55,0.5)')
@@ -381,15 +392,18 @@ export class CertificateService {
     ctx.lineTo(W - 200, footerY)
     ctx.stroke()
 
-    // Issued on + cert number centred
+    // Issued on
     const today = new Date().toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     })
     ctx.textAlign = 'center'
     ctx.font = `18px Arial`
     ctx.fillStyle = 'rgba(255,255,255,0.45)'
     ctx.fillText(`Issued on: ${today}`, W / 2, footerY + 40)
 
+    // Certificate number
     ctx.font = `bold 16px 'Courier New', monospace`
     ctx.fillStyle = '#d4af37'
     ctx.fillText(`Certificate No: ${certificateNumber}`, W / 2, footerY + 70)
@@ -409,7 +423,7 @@ export class CertificateService {
       console.warn('QR code generation failed:', err.message)
     }
 
-    // "Scan to verify"
+    // Scan to verify
     ctx.font = `14px Arial`
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
     ctx.fillText('Scan to verify authenticity', W / 2, footerY + 210)
@@ -435,8 +449,7 @@ export class CertificateService {
       ctx.arc(cx, cy, size, 0, Math.PI * 2)
       ctx.fill()
 
-      // Two concentric arcs
-      ;[22, 36].forEach(r => {
+      ;[22, 36].forEach((r) => {
         ctx.strokeStyle = 'rgba(212,175,55,0.6)'
         ctx.lineWidth = 2
         ctx.beginPath()
@@ -444,19 +457,20 @@ export class CertificateService {
         ctx.stroke()
       })
 
-      // Cross lines
       ctx.strokeStyle = 'rgba(212,175,55,0.4)'
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.moveTo(cx - 50, cy); ctx.lineTo(cx + 50, cy)
-      ctx.moveTo(cx, cy - 50); ctx.lineTo(cx, cy + 50)
+      ctx.moveTo(cx - 50, cy)
+      ctx.lineTo(cx + 50, cy)
+      ctx.moveTo(cx, cy - 50)
+      ctx.lineTo(cx, cy + 50)
       ctx.stroke()
     })
   }
 
   // ── Utility ─────────────────────────────────────────────────────────────────
   wrapText(ctx, text, maxWidth) {
-    const words = text.split(' ')
+    const words = (text || '').split(' ')
     const lines = []
     let current = words[0]
     for (let i = 1; i < words.length; i++) {
@@ -473,9 +487,9 @@ export class CertificateService {
   }
 
   generateCertificateNumber() {
-    const year = new Date().getFullYear()
-    const rand = Math.floor(Math.random() * 9999).toString().padStart(4, '0')
-    return `CERT-${year}-${rand}`
+    const ts = Date.now().toString(36).toUpperCase()
+    const rand = crypto.randomBytes(3).toString('hex').toUpperCase()
+    return `CERT-${ts}-${rand}`
   }
 
   generateVerificationCode() {
