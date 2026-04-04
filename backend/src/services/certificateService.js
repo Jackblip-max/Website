@@ -8,11 +8,29 @@ import crypto from 'crypto'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// ── Resolve logo URL/path → absolute filesystem path ─────────────────────────
-const resolveLogoPath = (logoValue) => {
+// ── Resolve the MyanVolunteer platform logo (frontend/public/logo.png) ────────
+const resolvePlatformLogo = () => {
+  const candidates = [
+    path.join(__dirname, '../../../frontend/public/logo.png'),
+    path.join(__dirname, '../../frontend/public/logo.png'),
+    path.join(process.cwd(), 'frontend/public/logo.png'),
+    path.join(process.cwd(), '../frontend/public/logo.png'),
+  ]
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      console.log('✅ Platform logo found at:', p)
+      return p
+    }
+  }
+  console.warn('⚠️  Platform logo not found, tried:', candidates)
+  return null
+}
+
+// ── Resolve org uploaded logo URL/path → absolute filesystem path ─────────────
+const resolveOrgLogoPath = (logoValue) => {
   if (!logoValue) return null
 
-  // ✅ FIX: Handle full URLs (http://... or https://...)
+  // Handle full URLs (http:// or https://)
   if (logoValue.startsWith('http://') || logoValue.startsWith('https://')) {
     try {
       const url = new URL(logoValue)
@@ -38,7 +56,7 @@ const resolveLogoPath = (logoValue) => {
     if (fs.existsSync(candidate)) return candidate
   }
 
-  console.warn('⚠️  Could not resolve logo path:', logoValue, '→ tried:', candidates)
+  console.warn('⚠️  Could not resolve org logo path:', logoValue, '→ tried:', candidates)
   return null
 }
 
@@ -83,10 +101,6 @@ export class CertificateService {
       certificateNumber,
       verificationCode,
     } = data
-
-    // ✅ DEBUG: Log what logo value is received (remove after fixing)
-    console.log('🔍 organizationLogo received:', organizationLogo)
-    console.log('🔍 resolved to:', resolveLogoPath(organizationLogo))
 
     const W = this.W
     const H = this.H
@@ -138,43 +152,48 @@ export class CertificateService {
     ctx.fillStyle = barGrad
     ctx.fillRect(margin + 24, margin + 24, 6, H - (margin + 24) * 2)
 
-    // ── 5. Logo / placeholder ─────────────────────────────────────────────────
-    const logoSize = 130
-    const logoX = W / 2 - logoSize / 2
-    const logoY = 112
+    // ── 5. Logo ───────────────────────────────────────────────────────────────
+    const logoSize = 140
+    const logoY = 90
     const logoCX = W / 2
     const logoCY = logoY + logoSize / 2
 
-    const resolvedLogo = resolveLogoPath(organizationLogo)
+    // Try org logo first → fall back to platform logo (frontend/public/logo.png)
+    const orgLogoPath = resolveOrgLogoPath(organizationLogo)
+    const platformLogoPath = resolvePlatformLogo()
+    const logoToUse = orgLogoPath || platformLogoPath
 
-    if (resolvedLogo) {
+    console.log('🔍 organizationLogo value:', organizationLogo)
+    console.log('🔍 orgLogoPath:', orgLogoPath)
+    console.log('🔍 platformLogoPath:', platformLogoPath)
+    console.log('🔍 using:', logoToUse)
+
+    if (logoToUse) {
       try {
-        const img = await loadImage(resolvedLogo)
-        // Circular clip
+        const img = await loadImage(logoToUse)
         ctx.save()
         ctx.beginPath()
         ctx.arc(logoCX, logoCY, logoSize / 2, 0, Math.PI * 2)
         ctx.clip()
-        ctx.drawImage(img, logoX, logoY, logoSize, logoSize)
+        ctx.drawImage(img, logoCX - logoSize / 2, logoY, logoSize, logoSize)
         ctx.restore()
-        // Gold ring around logo
+        // Gold ring
         ctx.strokeStyle = '#d4af37'
         ctx.lineWidth = 4
         ctx.beginPath()
         ctx.arc(logoCX, logoCY, logoSize / 2 + 6, 0, Math.PI * 2)
         ctx.stroke()
-        console.log('✅ Org logo rendered successfully')
+        console.log('✅ Logo rendered successfully')
       } catch (err) {
-        console.warn('⚠️  loadImage failed, using placeholder:', err.message)
+        console.warn('⚠️  loadImage failed:', err.message)
         this.drawLogoPlaceholder(ctx, organizationName, logoCX, logoCY, logoSize / 2)
       }
     } else {
-      console.warn('⚠️  No resolved logo path — rendering placeholder for:', organizationName)
       this.drawLogoPlaceholder(ctx, organizationName, logoCX, logoCY, logoSize / 2)
     }
 
-    // ── 6. Header text ────────────────────────────────────────────────────────
-    let curY = logoY + logoSize + 52
+    // ── 6. Header text — more space below logo ────────────────────────────────
+    let curY = logoY + logoSize + 80   // ✅ was 52, now 80 for breathing room
 
     ctx.textAlign = 'center'
     ctx.font = `bold 62px Georgia, serif`
@@ -184,7 +203,7 @@ export class CertificateService {
     ctx.letterSpacing = '0px'
 
     // Gold underline
-    curY += 18
+    curY += 24
     const ulW = 540
     const ulGrad = ctx.createLinearGradient(W / 2 - ulW / 2, 0, W / 2 + ulW / 2, 0)
     ulGrad.addColorStop(0, 'transparent')
@@ -205,7 +224,7 @@ export class CertificateService {
     ctx.fillText('This is to certify that', W / 2, curY)
 
     // ── 8. Volunteer name box ─────────────────────────────────────────────────
-    curY += 26
+    curY += 30
     curY = this.drawNameBox(ctx, volunteerName, W, curY)
 
     // ── 9. Body text ──────────────────────────────────────────────────────────
@@ -245,7 +264,7 @@ export class CertificateService {
       curY
     )
 
-    // ── 11. Footer (QR + cert number) ─────────────────────────────────────────
+    // ── 11. Footer ────────────────────────────────────────────────────────────
     await this.drawFooter(ctx, {
       certificateNumber,
       verificationCode,
@@ -260,7 +279,7 @@ export class CertificateService {
     const buffer = canvas.toBuffer('image/jpeg', { quality: 0.96 })
     fs.writeFileSync(filepath, buffer)
 
-    console.log('✅ Certificate generated:', filename)
+    console.log('✅ Certificate saved:', filename)
     return { filename, filepath, url: `/uploads/certificates/${filename}` }
   }
 
@@ -274,7 +293,6 @@ export class CertificateService {
     ctx.arc(cx, cy, radius, 0, Math.PI * 2)
     ctx.fill()
 
-    // Gold ring
     ctx.strokeStyle = '#d4af37'
     ctx.lineWidth = 4
     ctx.beginPath()
@@ -379,7 +397,6 @@ export class CertificateService {
   async drawFooter(ctx, { certificateNumber, verificationCode, W, H, bottomMargin }) {
     const footerY = H - bottomMargin - 160
 
-    // Separator line
     const sepGrad = ctx.createLinearGradient(200, 0, W - 200, 0)
     sepGrad.addColorStop(0, 'transparent')
     sepGrad.addColorStop(0.15, 'rgba(212,175,55,0.5)')
@@ -392,7 +409,6 @@ export class CertificateService {
     ctx.lineTo(W - 200, footerY)
     ctx.stroke()
 
-    // Issued on
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -403,12 +419,10 @@ export class CertificateService {
     ctx.fillStyle = 'rgba(255,255,255,0.45)'
     ctx.fillText(`Issued on: ${today}`, W / 2, footerY + 40)
 
-    // Certificate number
     ctx.font = `bold 16px 'Courier New', monospace`
     ctx.fillStyle = '#d4af37'
     ctx.fillText(`Certificate No: ${certificateNumber}`, W / 2, footerY + 70)
 
-    // QR code
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-certificate/${verificationCode}`
     try {
       const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
@@ -423,7 +437,6 @@ export class CertificateService {
       console.warn('QR code generation failed:', err.message)
     }
 
-    // Scan to verify
     ctx.font = `14px Arial`
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
     ctx.fillText('Scan to verify authenticity', W / 2, footerY + 210)
