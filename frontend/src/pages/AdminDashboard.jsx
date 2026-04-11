@@ -5,12 +5,12 @@ import toast from 'react-hot-toast'
 import {
   Shield, Users, Building2, FileCheck, Activity,
   CheckCircle, XCircle, Trash2, Search,
-  AlertTriangle, Clock, LogOut, X
+  AlertTriangle, Clock, LogOut, X, ScanSearch,
+  ShieldAlert, ShieldCheck, ShieldQuestion, FileWarning
 } from 'lucide-react'
 import { adminAuthService } from '../services/adminAuthService'
 import api from '../services/api'
 
-// ── 3D Canvas (same as AdminLogin) ──────────────────────────────────
 const AdminBackground = () => {
   const canvasRef = useRef(null)
   useEffect(() => {
@@ -35,6 +35,189 @@ const AdminBackground = () => {
 const glass = {background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',backdropFilter:'blur(20px)'}
 const glassCard = {...glass,borderRadius:16,boxShadow:'0 8px 32px rgba(0,0,0,0.4)'}
 
+// ─── Document Risk Widget ──────────────────────────────────────────────────────
+const DocumentRiskWidget = ({ documents }) => {
+  const [results, setResults] = useState({})
+  const [loading, setLoading] = useState({})
+  const [expanded, setExpanded] = useState(false)
+
+  const docList = (() => {
+    if (!documents) return []
+    if (Array.isArray(documents)) return documents
+    try { return JSON.parse(documents) }
+    catch { return typeof documents === 'string' ? [documents] : [] }
+  })()
+
+  if (!docList.length) return (
+    <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:8}}>
+      <FileWarning style={{width:14,height:14,color:'rgba(255,255,255,0.3)',flexShrink:0}}/>
+      <span style={{color:'rgba(255,255,255,0.3)',fontSize:11}}>No documents uploaded</span>
+    </div>
+  )
+
+  const analyzeDoc = async (filePath) => {
+    setLoading(prev => ({ ...prev, [filePath]: true }))
+    try {
+      const res = await api.post('/analysis/document', { filePath })
+      setResults(prev => ({ ...prev, [filePath]: res }))
+    } catch {
+      setResults(prev => ({ ...prev, [filePath]: { riskScore:null, riskLevel:'UNAVAILABLE', recommendation:'Service unavailable — start document_analyzer.py', color:'#6b7280', flags:['AI analyzer not running'], breakdown:null } }))
+    } finally {
+      setLoading(prev => ({ ...prev, [filePath]: false }))
+    }
+  }
+
+  const analyzeAll = () => docList.forEach(doc => { if (!results[doc] && !loading[doc]) analyzeDoc(doc) })
+
+  const getRiskIcon = (level) => {
+    if (level==='LOW') return <ShieldCheck style={{width:14,height:14}}/>
+    if (level==='MEDIUM') return <ShieldQuestion style={{width:14,height:14}}/>
+    if (level==='HIGH'||level==='VERY HIGH') return <ShieldAlert style={{width:14,height:14}}/>
+    return <ScanSearch style={{width:14,height:14}}/>
+  }
+
+  const allResults = docList.map(d => results[d]).filter(r => r && r.riskScore !== null)
+  const worstScore = allResults.length ? Math.max(...allResults.map(r => r.riskScore)) : null
+
+  const scoreColor = (s) => s<=30?'#22c55e':s<=55?'#f59e0b':s<=75?'#f97316':'#ef4444'
+  const scoreGradient = (s) => s<=30?'linear-gradient(90deg,#16a34a,#22c55e)':s<=55?'linear-gradient(90deg,#d97706,#f59e0b)':s<=75?'linear-gradient(90deg,#ea580c,#f97316)':'linear-gradient(90deg,#dc2626,#ef4444)'
+
+  return (
+    <div style={{marginTop:10,borderRadius:12,border:'1px solid rgba(255,255,255,0.08)',overflow:'hidden'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'rgba(0,0,0,0.2)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <ScanSearch style={{width:14,height:14,color:'#818cf8'}}/>
+          <span style={{color:'rgba(255,255,255,0.7)',fontSize:11,fontWeight:600,letterSpacing:'0.5px'}}>AI DOCUMENT RISK</span>
+          <span style={{color:'rgba(255,255,255,0.25)',fontSize:10}}>({docList.length} doc{docList.length>1?'s':''})</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {worstScore !== null && (
+            <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,background:`${scoreColor(worstScore)}18`,color:scoreColor(worstScore),border:`1px solid ${scoreColor(worstScore)}40`}}>
+              {worstScore}% risk
+            </span>
+          )}
+          <button onClick={analyzeAll} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',borderRadius:8,background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.3)',color:'#a5b4fc',fontSize:11,fontWeight:600,cursor:'pointer'}}>
+            <ScanSearch style={{width:12,height:12}}/> Analyze All
+          </button>
+          <button onClick={()=>setExpanded(!expanded)} style={{padding:'5px 8px',borderRadius:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.4)',fontSize:10,cursor:'pointer'}}>
+            {expanded?'▲ Hide':'▼ Show'}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:10}}>
+          {docList.map((doc, i) => {
+            const result = results[doc]
+            const isLoading = loading[doc]
+            const filename = doc.split('/').pop().split('\\').pop()
+            return (
+              <div key={doc} style={{borderRadius:10,border:'1px solid rgba(255,255,255,0.07)',overflow:'hidden'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'rgba(255,255,255,0.03)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                    <FileCheck style={{width:13,height:13,color:'rgba(255,255,255,0.35)',flexShrink:0}}/>
+                    <span style={{color:'rgba(255,255,255,0.5)',fontSize:11,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Doc {i+1}: {filename}</span>
+                  </div>
+                  {!result && !isLoading && (
+                    <button onClick={()=>analyzeDoc(doc)} style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:7,background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.3)',color:'#a5b4fc',fontSize:10,fontWeight:600,cursor:'pointer',flexShrink:0}}>
+                      <ScanSearch style={{width:11,height:11}}/> Scan
+                    </button>
+                  )}
+                  {isLoading && (
+                    <div style={{display:'flex',alignItems:'center',gap:6,color:'rgba(255,255,255,0.35)',fontSize:10}}>
+                      <div style={{width:10,height:10,border:'2px solid rgba(99,102,241,0.4)',borderTopColor:'#818cf8',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+                      Analyzing...
+                    </div>
+                  )}
+                  {result && (
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                      <span style={{color:result.color}}>{getRiskIcon(result.riskLevel)}</span>
+                      <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,background:`${result.color}18`,color:result.color,border:`1px solid ${result.color}40`}}>
+                        {result.riskScore!==null?`${result.riskScore}%`:'—'} · {result.riskLevel}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {result && (
+                  <div style={{padding:'12px'}}>
+                    {result.riskScore !== null && (
+                      <div style={{marginBottom:12}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                          <span style={{color:'rgba(255,255,255,0.4)',fontSize:10,fontWeight:600,letterSpacing:'0.5px'}}>OVERALL RISK SCORE</span>
+                          <span style={{color:result.color,fontSize:12,fontWeight:700}}>{result.riskScore}%</span>
+                        </div>
+                        <div style={{height:8,borderRadius:4,background:'rgba(255,255,255,0.08)',overflow:'hidden'}}>
+                          <div style={{height:'100%',borderRadius:4,width:`${result.riskScore}%`,background:scoreGradient(result.riskScore),transition:'width 0.8s ease'}}/>
+                        </div>
+                        <div style={{display:'flex',justifyContent:'space-between',marginTop:3}}>
+                          {['0%','25%','50%','75%','100%'].map(v=>(
+                            <span key={v} style={{color:'rgba(255,255,255,0.2)',fontSize:9}}>{v}</span>
+                          ))}
+                        </div>
+                        <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
+                          {[['🟢','LOW'],['🟡','MED'],['🟠','HIGH'],['🔴','V.HIGH']].map(([e,l])=>(
+                            <span key={l} style={{color:'rgba(255,255,255,0.2)',fontSize:9}}>{e} {l}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {result.breakdown && (
+                      <div style={{marginBottom:12}}>
+                        <div style={{color:'rgba(255,255,255,0.3)',fontSize:10,fontWeight:600,letterSpacing:'0.5px',marginBottom:8}}>BREAKDOWN</div>
+                        {[
+                          {label:'Manipulation (ELA)', value:result.breakdown.manipulation, tip:'Image editing detected via Error Level Analysis'},
+                          {label:'Not a Document',     value:result.breakdown.notDocument,  tip:'Image does not resemble an official document'},
+                          {label:'Metadata Anomaly',   value:result.breakdown.metadata,     tip:'Screenshot or edited file signature detected'},
+                          {label:'No Text Detected',   value:result.breakdown.noText,       tip:'No readable text regions found'},
+                        ].map(({label,value,tip})=>(
+                          <div key={label} style={{marginBottom:7}} title={tip}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                              <span style={{color:'rgba(255,255,255,0.35)',fontSize:10}}>{label}</span>
+                              <span style={{color:value>50?'#f87171':value>25?'#fbbf24':'#4ade80',fontSize:10,fontWeight:600}}>{value}%</span>
+                            </div>
+                            <div style={{height:3,borderRadius:2,background:'rgba(255,255,255,0.06)'}}>
+                              <div style={{height:'100%',borderRadius:2,width:`${value}%`,background:value>50?'rgba(239,68,68,0.7)':value>25?'rgba(245,158,11,0.7)':'rgba(34,197,94,0.7)',transition:'width 0.6s ease'}}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{marginBottom:10}}>
+                      <div style={{color:'rgba(255,255,255,0.3)',fontSize:10,fontWeight:600,letterSpacing:'0.5px',marginBottom:6}}>FINDINGS</div>
+                      {result.flags.map((flag,fi)=>(
+                        <div key={fi} style={{display:'flex',alignItems:'flex-start',gap:7,marginBottom:5}}>
+                          <span style={{color:flag.includes('No suspicious')?'#4ade80':'#fbbf24',marginTop:1,flexShrink:0}}>{flag.includes('No suspicious')?'✓':'⚠'}</span>
+                          <span style={{color:'rgba(255,255,255,0.5)',fontSize:11,lineHeight:1.4}}>{flag}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{padding:'8px 12px',borderRadius:8,background:`${result.color}12`,border:`1px solid ${result.color}30`,display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{color:result.color}}>{getRiskIcon(result.riskLevel)}</span>
+                      <div>
+                        <span style={{color:'rgba(255,255,255,0.35)',fontSize:10}}>Recommendation: </span>
+                        <span style={{color:result.color,fontSize:11,fontWeight:600}}>{result.recommendation}</span>
+                      </div>
+                    </div>
+
+                    <p style={{color:'rgba(255,255,255,0.2)',fontSize:10,marginTop:8,fontStyle:'italic',lineHeight:1.4}}>
+                      ⓘ AI-assisted indicator only. Admin judgment is always final.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Dashboard ────────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -51,12 +234,10 @@ const AdminDashboard = () => {
   const {data:users,isLoading:usersLoading} = useQuery({queryKey:['allUsers',searchQuery],queryFn:async()=>{const r=await api.get(`/admin/users${searchQuery?`?search=${searchQuery}`:''}`);return Array.isArray(r)?r:(r?.data||[])},enabled:!!adminUser&&activeTab==='users',staleTime:0,refetchOnMount:true})
 
   const closeModal = () => {setActionModal(null);setSelectedOrg(null);setSelectedUser(null);setActionReason('')}
-
   const approveMutation = useMutation({mutationFn:({id,message})=>api.post(`/admin/organizations/${id}/approve`,{message}),onSuccess:()=>{queryClient.invalidateQueries(['pendingOrganizations']);queryClient.invalidateQueries(['adminStats']);closeModal();toast.success('Approved!')},onError:(e)=>toast.error(e.response?.data?.message||'Failed')})
   const rejectMutation = useMutation({mutationFn:({id,reason})=>api.post(`/admin/organizations/${id}/reject`,{reason}),onSuccess:()=>{queryClient.invalidateQueries(['pendingOrganizations']);queryClient.invalidateQueries(['adminStats']);closeModal();toast.success('Rejected')},onError:(e)=>toast.error(e.response?.data?.message||'Failed')})
   const deleteUserMutation = useMutation({mutationFn:({id,reason})=>api.delete(`/admin/users/${id}`,{data:{reason}}),onSuccess:()=>{queryClient.invalidateQueries(['allUsers']);queryClient.invalidateQueries(['adminStats']);closeModal();toast.success('User deleted')},onError:(e)=>toast.error(e.response?.data?.message||'Failed')})
   const deleteOrgMutation = useMutation({mutationFn:({id,reason})=>api.delete(`/admin/organizations/${id}`,{data:{reason}}),onSuccess:()=>{queryClient.invalidateQueries(['allUsers']);queryClient.invalidateQueries(['adminStats']);closeModal();toast.success('Org removed')},onError:(e)=>toast.error(e.response?.data?.message||'Failed')})
-
   const isLoading = approveMutation.isPending||rejectMutation.isPending||deleteUserMutation.isPending||deleteOrgMutation.isPending
 
   const confirmAction = () => {
@@ -78,8 +259,6 @@ const AdminDashboard = () => {
     <div style={{minHeight:'100vh',background:'#080d1a',position:'relative',fontFamily:'system-ui,sans-serif'}}>
       <AdminBackground/>
       <div style={{position:'relative',zIndex:1}}>
-
-        {/* Header */}
         <div style={{...glass,borderBottom:'1px solid rgba(255,255,255,0.06)',borderRadius:0}}>
           <div style={{maxWidth:1200,margin:'0 auto',padding:'0 16px',height:64,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -96,8 +275,7 @@ const AdminDashboard = () => {
                 <div style={{color:'#fff',fontSize:13,fontWeight:600}}>{adminUser?.name}</div>
                 <div style={{color:'rgba(255,255,255,0.3)',fontSize:11}}>{adminUser?.email}</div>
               </div>
-              <button onClick={()=>{adminAuthService.logout();navigate('/admin/login')}}
-                style={{display:'flex',alignItems:'center',gap:6,padding:'8px 12px',borderRadius:10,background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.7)',fontSize:12,cursor:'pointer'}}>
+              <button onClick={()=>{adminAuthService.logout();navigate('/admin/login')}} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 12px',borderRadius:10,background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.7)',fontSize:12,cursor:'pointer'}}>
                 <LogOut className="w-4 h-4"/><span className="hidden sm:inline">Logout</span>
               </button>
             </div>
@@ -105,8 +283,6 @@ const AdminDashboard = () => {
         </div>
 
         <div style={{maxWidth:1200,margin:'0 auto',padding:'20px 16px'}}>
-
-          {/* Stat Cards */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:20}}>
             {[
               {icon:<Users className="w-6 h-6"/>,label:'Total Users',value:stats?.totalUsers??0,accent:'#3b82f6'},
@@ -126,27 +302,20 @@ const AdminDashboard = () => {
             ))}
           </div>
 
-          {/* Tabs */}
           <div style={{...glassCard,marginBottom:16,padding:'4px',display:'flex',gap:4,overflowX:'auto'}}>
             {[
               {id:'overview',label:'Overview'},
               {id:'pending',label:`Pending (${stats?.pendingOrganizations??0})`,badge:stats?.pendingOrganizations>0},
               {id:'users',label:'Users'},
             ].map(tab=>(
-              <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-                style={{position:'relative',display:'flex',alignItems:'center',gap:6,padding:'10px 14px',borderRadius:12,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .2s',whiteSpace:'nowrap',
-                  background:activeTab===tab.id?'rgba(99,102,241,0.2)':'transparent',
-                  color:activeTab===tab.id?'#a5b4fc':'rgba(255,255,255,0.4)',
-                  borderBottom:activeTab===tab.id?'1px solid rgba(99,102,241,0.4)':'1px solid transparent'}}>
+              <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{position:'relative',display:'flex',alignItems:'center',gap:6,padding:'10px 14px',borderRadius:12,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,transition:'all .2s',whiteSpace:'nowrap',background:activeTab===tab.id?'rgba(99,102,241,0.2)':'transparent',color:activeTab===tab.id?'#a5b4fc':'rgba(255,255,255,0.4)',borderBottom:activeTab===tab.id?'1px solid rgba(99,102,241,0.4)':'1px solid transparent'}}>
                 {tab.label}
                 {tab.badge&&<span style={{position:'absolute',top:8,right:8,width:6,height:6,borderRadius:'50%',background:'#f97316',animation:'blink 2s infinite'}}/>}
               </button>
             ))}
           </div>
 
-          {/* Tab Content */}
           <div style={{...glassCard,padding:'20px 16px'}}>
-
             {activeTab==='overview'&&(
               <div>
                 <h2 style={{color:'#fff',fontSize:18,fontWeight:700,marginBottom:20}}>System Overview</h2>
@@ -171,7 +340,13 @@ const AdminDashboard = () => {
 
             {activeTab==='pending'&&(
               <div>
-                <h2 style={{color:'#fff',fontSize:18,fontWeight:700,marginBottom:18}}>Pending ({(pendingOrgs||[]).length})</h2>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexWrap:'wrap',gap:10}}>
+                  <h2 style={{color:'#fff',fontSize:18,fontWeight:700}}>Pending ({(pendingOrgs||[]).length})</h2>
+                  <div style={{display:'flex',alignItems:'center',gap:6,padding:'5px 10px',borderRadius:8,background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.2)'}}>
+                    <ScanSearch style={{width:12,height:12,color:'#818cf8'}}/>
+                    <span style={{color:'rgba(255,255,255,0.4)',fontSize:10}}>Click "Analyze All" on each org to run AI document check</span>
+                  </div>
+                </div>
                 {orgsLoading?<div style={{textAlign:'center',padding:40,color:'rgba(255,255,255,0.3)'}}>Loading...</div>
                 :!(pendingOrgs||[]).length?(
                   <div style={{textAlign:'center',padding:40}}>
@@ -182,22 +357,22 @@ const AdminDashboard = () => {
                 ):(pendingOrgs||[]).map(org=>(
                   <div key={org.id} style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,padding:'16px',marginBottom:14}}>
                     <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-                      <div style={{width:40,height:40,borderRadius:12,background:'linear-gradient(135deg,#3b82f6,#6366f1)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:16,flexShrink:0}}>
-                        {org.name?.charAt(0)}
-                      </div>
+                      <div style={{width:40,height:40,borderRadius:12,background:'linear-gradient(135deg,#3b82f6,#6366f1)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:16,flexShrink:0}}>{org.name?.charAt(0)}</div>
                       <div>
                         <div style={{color:'#fff',fontWeight:700,fontSize:14}}>{org.name}</div>
                         <div style={{color:'rgba(255,255,255,0.35)',fontSize:11}}>{org.user?.email}</div>
                       </div>
                     </div>
                     <p style={{color:'rgba(255,255,255,0.45)',fontSize:12,lineHeight:1.5,marginBottom:12}}>{org.description?.slice(0,120)}...</p>
-                    <div style={{display:'flex',gap:8,borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:12}}>
-                      <button onClick={()=>{setSelectedOrg(org);setActionModal('approve')}}
-                        style={{flex:1,padding:'10px',borderRadius:10,background:'rgba(34,197,94,0.15)',border:'1px solid rgba(34,197,94,0.3)',color:'#4ade80',fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+
+                    {/* ✅ AI Risk Widget */}
+                    <DocumentRiskWidget documents={org.documents} />
+
+                    <div style={{display:'flex',gap:8,borderTop:'1px solid rgba(255,255,255,0.06)',paddingTop:12,marginTop:12}}>
+                      <button onClick={()=>{setSelectedOrg(org);setActionModal('approve')}} style={{flex:1,padding:'10px',borderRadius:10,background:'rgba(34,197,94,0.15)',border:'1px solid rgba(34,197,94,0.3)',color:'#4ade80',fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
                         <CheckCircle className="w-4 h-4"/>Approve
                       </button>
-                      <button onClick={()=>{setSelectedOrg(org);setActionModal('reject')}}
-                        style={{flex:1,padding:'10px',borderRadius:10,background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.25)',color:'#f87171',fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                      <button onClick={()=>{setSelectedOrg(org);setActionModal('reject')}} style={{flex:1,padding:'10px',borderRadius:10,background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.25)',color:'#f87171',fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
                         <XCircle className="w-4 h-4"/>Reject
                       </button>
                     </div>
@@ -212,8 +387,7 @@ const AdminDashboard = () => {
                   <h2 style={{color:'#fff',fontSize:18,fontWeight:700}}>Users</h2>
                   <div style={{position:'relative'}}>
                     <Search style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',width:14,height:14,color:'rgba(255,255,255,0.3)'}}/>
-                    <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search users..."
-                      style={{paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,color:'#fff',fontSize:13,outline:'none',width:200}}/>
+                    <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search users..." style={{paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,color:'#fff',fontSize:13,outline:'none',width:200}}/>
                   </div>
                 </div>
                 {usersLoading?<div style={{textAlign:'center',padding:40,color:'rgba(255,255,255,0.3)'}}>Loading...</div>
@@ -225,45 +399,28 @@ const AdminDashboard = () => {
                           <div style={{color:'#fff',fontSize:13,fontWeight:600,marginBottom:2}}>{user.name}</div>
                           <div style={{color:'rgba(255,255,255,0.35)',fontSize:11,marginBottom:4}}>{user.email}</div>
                           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                            <span style={{padding:'2px 8px',borderRadius:20,fontSize:10,fontWeight:600,
-                              background:user.role==='admin'?'rgba(59,130,246,0.15)':user.role==='organization'?'rgba(168,85,247,0.15)':'rgba(34,197,94,0.15)',
-                              color:user.role==='admin'?'#93c5fd':user.role==='organization'?'#d8b4fe':'#86efac'}}>
-                              {user.role}
-                            </span>
+                            <span style={{padding:'2px 8px',borderRadius:20,fontSize:10,fontWeight:600,background:user.role==='admin'?'rgba(59,130,246,0.15)':user.role==='organization'?'rgba(168,85,247,0.15)':'rgba(34,197,94,0.15)',color:user.role==='admin'?'#93c5fd':user.role==='organization'?'#d8b4fe':'#86efac'}}>{user.role}</span>
                             {user.isVerified?<CheckCircle style={{width:12,height:12,color:'#4ade80'}}/>:<XCircle style={{width:12,height:12,color:'rgba(255,255,255,0.2)'}}/>}
                           </div>
                         </div>
                         {user.role!=='admin'&&(
                           <div style={{display:'flex',gap:6,flexShrink:0}}>
-                            {user.organization&&(
-                              <button onClick={()=>{setSelectedUser(user);setActionModal('deleteOrg')}} title="Remove org only"
-                                style={{padding:'7px',borderRadius:8,background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#fb923c',cursor:'pointer'}}>
-                                <Building2 style={{width:14,height:14}}/>
-                              </button>
-                            )}
-                            <button onClick={()=>{setSelectedUser(user);setActionModal('deleteUser')}} title="Delete user"
-                              style={{padding:'7px',borderRadius:8,background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',cursor:'pointer'}}>
-                              <Trash2 style={{width:14,height:14}}/>
-                            </button>
+                            {user.organization&&<button onClick={()=>{setSelectedUser(user);setActionModal('deleteOrg')}} title="Remove org only" style={{padding:'7px',borderRadius:8,background:'rgba(249,115,22,0.1)',border:'1px solid rgba(249,115,22,0.2)',color:'#fb923c',cursor:'pointer'}}><Building2 style={{width:14,height:14}}/></button>}
+                            <button onClick={()=>{setSelectedUser(user);setActionModal('deleteUser')}} title="Delete user" style={{padding:'7px',borderRadius:8,background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',cursor:'pointer'}}><Trash2 style={{width:14,height:14}}/></button>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
-                ):(
-                  <div style={{textAlign:'center',padding:40,color:'rgba(255,255,255,0.3)',fontSize:13}}>No users found</div>
-                )}
+                ):<div style={{textAlign:'center',padding:40,color:'rgba(255,255,255,0.3)',fontSize:13}}>No users found</div>}
               </div>
             )}
-
           </div>
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       {actionModal&&mc&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}
-          onClick={e=>e.target===e.currentTarget&&closeModal()}>
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}} onClick={e=>e.target===e.currentTarget&&closeModal()}>
           <div style={{...glassCard,width:'100%',maxWidth:420,background:'rgba(10,15,30,0.95)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
               <span style={{color:'#fff',fontWeight:700,fontSize:15}}>{mc.title}</span>
@@ -272,23 +429,14 @@ const AdminDashboard = () => {
             <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
               <div style={{padding:'12px 14px',borderRadius:10,background:mc.descBg,border:`1px solid ${mc.descBorder}`,color:mc.descText,fontSize:13,lineHeight:1.5}}>{mc.desc}</div>
               <div>
-                <label style={{display:'block',color:'rgba(255,255,255,0.4)',fontSize:11,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',marginBottom:6}}>
-                  {mc.required?'Reason *':'Message (optional)'}
-                </label>
-                <textarea value={actionReason} onChange={e=>setActionReason(e.target.value)}
-                  placeholder={mc.required?'Minimum 10 characters...':'Optional...'}
-                  rows={3} autoFocus
-                  style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'10px 12px',color:'#fff',fontSize:13,outline:'none',resize:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
+                <label style={{display:'block',color:'rgba(255,255,255,0.4)',fontSize:11,fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',marginBottom:6}}>{mc.required?'Reason *':'Message (optional)'}</label>
+                <textarea value={actionReason} onChange={e=>setActionReason(e.target.value)} placeholder={mc.required?'Minimum 10 characters...':'Optional...'} rows={3} autoFocus style={{width:'100%',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,padding:'10px 12px',color:'#fff',fontSize:13,outline:'none',resize:'none',fontFamily:'inherit',boxSizing:'border-box'}}/>
                 {mc.required&&<div style={{fontSize:11,marginTop:4,color:actionReason.trim().length>=10?'#4ade80':'rgba(255,255,255,0.3)'}}>{actionReason.trim().length}/10 min</div>}
               </div>
             </div>
             <div style={{display:'flex',gap:10,padding:'0 20px 20px'}}>
-              <button onClick={closeModal} disabled={isLoading}
-                style={{flex:1,padding:'11px',borderRadius:10,background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                Cancel
-              </button>
-              <button onClick={confirmAction} disabled={isLoading||(mc.required&&actionReason.trim().length<10)}
-                style={{flex:1,padding:'11px',borderRadius:10,background:mc.btnColor,border:'none',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',opacity:(isLoading||(mc.required&&actionReason.trim().length<10))?.4:1}}>
+              <button onClick={closeModal} disabled={isLoading} style={{flex:1,padding:'11px',borderRadius:10,background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',fontSize:13,fontWeight:600,cursor:'pointer'}}>Cancel</button>
+              <button onClick={confirmAction} disabled={isLoading||(mc.required&&actionReason.trim().length<10)} style={{flex:1,padding:'11px',borderRadius:10,background:mc.btnColor,border:'none',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',opacity:(isLoading||(mc.required&&actionReason.trim().length<10))?.4:1}}>
                 {isLoading?'Processing...':mc.label}
               </button>
             </div>
@@ -299,6 +447,7 @@ const AdminDashboard = () => {
       <style>{`
         @keyframes pulseRing{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.6;transform:scale(1.01)}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .hidden{display:none}
         @media(min-width:640px){.sm\\:block{display:block!important}.sm\\:inline{display:inline!important}}
       `}</style>
