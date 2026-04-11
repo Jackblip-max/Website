@@ -14,6 +14,7 @@ import { sequelize } from './src/config/database.js'
 import { checkExpiredDeadlines, sendDeadlineReminders } from './src/jobs/deadlineChecker.js'
 import routes from './src/routes/index.js'
 import { errorHandler } from './src/middleware/errorHandler.js'
+import analysisRoutes from './src/routes/analysisRoutes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -34,6 +35,7 @@ app.use(cors({
 app.use(morgan('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+app.use('/api/analysis', analysisRoutes)
 
 // Session configuration - MUST BE BEFORE passport initialization
 app.use(session({
